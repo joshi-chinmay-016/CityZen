@@ -1,10 +1,12 @@
 {
-  "name": "backend",
+  "name": "cityzen-backend",
   "version": "1.0.0",
-  "description": "just for Empty commit",
-  "main": "index.js",
+  "description": "CityZen backend API service",
+  "main": "src/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
   },
   "keywords": [],
   "author": "",

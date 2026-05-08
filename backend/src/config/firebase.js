@@ -1,3 +1,17 @@
+/*
+====================================================
+OWNER: Vishal
+MODULE: Backend Logic & APIs
+
+RESPONSIBILITIES:
+- Express APIs
+- Route Stress Engine
+- Firestore Integration
+- OSRM Integration
+- Backend Services
+====================================================
+*/
+
 const admin = require("firebase-admin");
 const path = require("path");
 const fs = require("fs");
