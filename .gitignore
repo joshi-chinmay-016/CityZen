@@ -48,6 +48,8 @@ build/
 .storybook-out
 tmp/
 temp/
+__pycache__/
+*.py[cod]
 
 # Editor directories and files
 .vscode/
