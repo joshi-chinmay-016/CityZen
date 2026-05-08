@@ -1,12 +1,16 @@
-const axios = require('axios');
+/*
+Owned by Person 2
+MODULE: Legacy Report Service Wrapper
+*/
+
+const reportService = require("../src/services/reportService");
 
 async function getReports() {
-	try {
-		const response = await axios.get('http://localhost:5000/reports');
-		return response.data;
-	} catch (error) {
-		return [];
-	}
+  return reportService.getAllReports();
 }
 
-module.exports = { getReports };
+async function createReport(reportData) {
+  return reportService.createReport(reportData);
+}
+
+module.exports = { getReports, createReport };

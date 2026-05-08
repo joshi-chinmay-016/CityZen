@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+firebase-admin
+ultralytics
+opencv-python
+numpy
