@@ -54,13 +54,26 @@ const heatmapService = {
       const heatmapData = reports
         .filter((report) => {
           // Ignore reports with invalid or missing coordinates.
-          const lat = Number(report.latitude ?? report.lat);
-          const lng = Number(report.longitude ?? report.lng);
+          // ======================================================
+          // LEGACY FALLBACK (TEMPORARILY COMMENTED)
+          // Previously checked both report.lat/report.lng and
+          // report.latitude/report.longitude. ML now writes
+          // standardized latitude/longitude directly.
+          // const lat = Number(report.latitude ?? report.lat);
+          // const lng = Number(report.longitude ?? report.lng);
+          // ======================================================
+          const lat = Number(report.latitude);
+          const lng = Number(report.longitude);
           return Number.isFinite(lat) && Number.isFinite(lng);
         })
         .map((report) => {
-          const latitude = Number(report.latitude ?? report.lat);
-          const longitude = Number(report.longitude ?? report.lng);
+          // ======================================================
+          // LEGACY FALLBACK (TEMPORARILY COMMENTED)
+          // const latitude = Number(report.latitude ?? report.lat);
+          // const longitude = Number(report.longitude ?? report.lng);
+          // ======================================================
+          const latitude = Number(report.latitude);
+          const longitude = Number(report.longitude);
           const severity = String(report.severity || 'medium').toLowerCase();
           const intensity = SEVERITY_INTENSITY_MAP[severity] ?? 0.6;
 

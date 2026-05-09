@@ -16,14 +16,21 @@ const db = require('../config/firebase');
 
 const COLLECTION = 'reports';
 
-// Severity fallback map keeps the contract stable even when legacy Firestore
-// documents only provide a hazard type.
+// ======================================================
+// LEGACY NORMALIZATION FALLBACK (TEMPORARILY COMMENTED)
+// Previously used when Firestore stored lat/lng/type fields
+// instead of standardized schema.
+// The ML layer now writes fully normalized reports.
+// Can be permanently removed after full migration.
+// ======================================================
+/*
 const HAZARD_SEVERITY_MAP = {
   pothole: 'high',
   traffic: 'medium',
   crack: 'low',
   open_manhole: 'high'
 };
+*/
 
 const SEVERITY_INTENSITY_MAP = {
   high: 1.0,
@@ -31,6 +38,13 @@ const SEVERITY_INTENSITY_MAP = {
   low: 0.3
 };
 
+// ======================================================
+// LEGACY TIMESTAMP NORMALIZATION (TEMPORARILY COMMENTED)
+// Previously handled multiple timestamp formats when
+// Firestore documents came from various sources.
+// ML service now writes ISO strings directly.
+// ======================================================
+/*
 const normalizeTimestamp = (timestamp) => {
   if (timestamp === undefined || timestamp === null || timestamp === '') {
     return new Date().toISOString();
@@ -82,18 +96,21 @@ const normalizeNumber = (value, fallback = null) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 };
+*/
 
 /**
- * Normalizes a raw Firestore report document into the official API contract.
- * This keeps legacy documents compatible with the frontend and future route
- * intelligence features.
+ * Transforms raw Firestore report into API contract.
+ * ML service now writes fully standardized schema,
+ * so normalization is straightforward passthrough.
  */
 const normalizeReport = (report = {}) => {
-  const latitude = normalizeNumber(report.latitude ?? report.lat);
-  const longitude = normalizeNumber(report.longitude ?? report.lng);
-  const hazard = String(report.hazard ?? report.type ?? 'unknown').toLowerCase();
-  const severity = normalizeSeverity(report.severity, hazard);
-  const confidence = normalizeNumber(report.confidence, 1) ?? 1;
+  // Active schema (ML writes these fields directly)
+  const latitude = Number(report.latitude);
+  const longitude = Number(report.longitude);
+  const hazard = String(report.hazard || 'unknown').toLowerCase();
+  const severity = String(report.severity || 'medium').toLowerCase();
+  const confidence = Number(report.confidence ?? 1);
+  const timestamp = String(report.timestamp || new Date().toISOString());
 
   return {
     id: report.id ? String(report.id) : '',
@@ -102,7 +119,7 @@ const normalizeReport = (report = {}) => {
     hazard,
     severity,
     confidence,
-    timestamp: normalizeTimestamp(report.timestamp)
+    timestamp
   };
 };
 

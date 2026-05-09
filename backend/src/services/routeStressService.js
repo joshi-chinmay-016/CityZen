@@ -69,8 +69,16 @@ const findNearbyHazards = (routeCoordinates, reports, radius) => {
     }
 
     for (const report of reports) {
-      const hazardLat = Number(report.latitude ?? report.lat);
-      const hazardLng = Number(report.longitude ?? report.lng);
+      // ======================================================
+      // LEGACY FALLBACK (TEMPORARILY COMMENTED)
+      // Previously supported both report.lat/report.lng
+      // and report.latitude/report.longitude.
+      // ML service now writes only standardized fields.
+      // const hazardLat = Number(report.latitude ?? report.lat);
+      // const hazardLng = Number(report.longitude ?? report.lng);
+      // ======================================================
+      const hazardLat = Number(report.latitude);
+      const hazardLng = Number(report.longitude);
 
       if (!Number.isFinite(hazardLat) || !Number.isFinite(hazardLng)) {
         continue;
@@ -85,11 +93,17 @@ const findNearbyHazards = (routeCoordinates, reports, radius) => {
       const current = nearbyHazardsMap.get(hazardKey);
 
       if (!current || distanceMeters < current.closest_distance_meters) {
+        // ======================================================
+        // LEGACY FALLBACK (TEMPORARILY COMMENTED)
+        // Previously supported report.type as fallback for
+        // report.hazard field. ML now writes hazard directly.
+        // hazard: report.hazard || report.type || 'unknown',
+        // ======================================================
         nearbyHazardsMap.set(hazardKey, {
           id: report.id || null,
           latitude: hazardLat,
           longitude: hazardLng,
-          hazard: report.hazard || report.type || 'unknown',
+          hazard: String(report.hazard || 'unknown').toLowerCase(),
           severity: String(report.severity || 'medium').toLowerCase(),
           closest_distance_meters: distanceMeters
         });
@@ -139,7 +153,13 @@ const routeStressService = {
 
       // 2) Pull normalized hazard reports from Firestore intelligence layer.
       const reports = await firestoreService.getAllReports();
-      console.log("REPORTS:", reports);
+      // ======================================================
+      // DEBUG LOGGING (TEMPORARILY COMMENTED)
+      // Used during Firestore normalization + route matching tests.
+      // Can be re-enabled for backend debugging if needed.
+      // ======================================================
+
+      // console.log("REPORTS:", reports);
 
       // 3) Find hazards within 100m of the route and score risk.
       const nearbyHazards = findNearbyHazards(routeCoordinates, reports, HAZARD_SEARCH_RADIUS_METERS);
