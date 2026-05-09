@@ -5,7 +5,9 @@ OWNER: Sushanth
 MODULE: Leaflet Client Map
 */
 
+import "@/lib/leaflet";
 import { MapContainer, TileLayer } from "react-leaflet";
+import CurrentLocation from "./CurrentLocation";
 
 const bangaloreCenter: [number, number] = [12.9716, 77.5946];
 
@@ -23,6 +25,7 @@ export default function LeafletMap() {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution="© OpenStreetMap contributors"
         />
+        <CurrentLocation />
       </MapContainer>
     </div>
   );
