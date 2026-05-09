@@ -6,14 +6,20 @@ MODULE: Leaflet Client Map
 */
 
 import "@/lib/leaflet";
+
 import { MapContainer, TileLayer } from "react-leaflet";
+
 import CurrentLocation from "./CurrentLocation";
+import MarkerLayer from "./MarkerLayer";
 
 const bangaloreCenter: [number, number] = [12.9716, 77.5946];
 
 export default function LeafletMap() {
   return (
-    <div className="h-screen w-full" style={{ height: "100vh", width: "100vw" }}>
+    <div
+      className="h-screen w-full"
+      style={{ height: "100vh", width: "100vw" }}
+    >
       <MapContainer
         center={bangaloreCenter}
         zoom={13}
@@ -25,7 +31,12 @@ export default function LeafletMap() {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution="© OpenStreetMap contributors"
         />
+
+        {/* Live User Location */}
         <CurrentLocation />
+
+        {/* Hazard Report Markers */}
+        <MarkerLayer />
       </MapContainer>
     </div>
   );

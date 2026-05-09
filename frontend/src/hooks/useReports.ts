@@ -12,20 +12,25 @@ RESPONSIBILITIES:
 ====================================================
 */
 
-import { useState, useEffect } from 'react';
-import { reportService } from '../services/reportService';
-import type { Report } from '../types';
+import { useState, useEffect } from "react";
+import { reportService } from "../services/reportService";
+import type { HazardReport } from "../types/report";
 
 export const useReports = () => {
-  const [reports, setReports] = useState<Report[]>([]);
+  const [reports, setReports] = useState<HazardReport[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchReports = async () => {
     try {
+      setLoading(true);
+      setError(null);
+
       const data = await reportService.getReports();
       setReports(data);
-    } catch (error) {
-      console.error('Failed to fetch reports', error);
+    } catch (err) {
+      console.error("Failed to fetch reports", err);
+      setError("Failed to fetch reports");
     } finally {
       setLoading(false);
     }
@@ -35,5 +40,10 @@ export const useReports = () => {
     fetchReports();
   }, []);
 
-  return { reports, loading, refresh: fetchReports };
+  return {
+    reports,
+    loading,
+    error,
+    refresh: fetchReports,
+  };
 };
