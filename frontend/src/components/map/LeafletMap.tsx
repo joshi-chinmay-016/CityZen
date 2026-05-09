@@ -6,7 +6,7 @@ MODULE: Leaflet Client Map
 */
 
 import "@/lib/leaflet";
-
+import SeverityLegend from "./SeverityLegend";
 import { MapContainer, TileLayer } from "react-leaflet";
 import HeatmapLayer from "./HeatmapLayer";
 import CurrentLocation from "./CurrentLocation";
@@ -41,6 +41,7 @@ export default function LeafletMap() {
         {/* Heatmap Layer */}
         <HeatmapLayer />
       </MapContainer>
+      <SeverityLegend />
     </div>
   );
 }
