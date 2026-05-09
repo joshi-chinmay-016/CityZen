@@ -25,6 +25,9 @@ export default function LeafletMap() {
   error,
   fetchSafeRoute,
 } = useSafeRoute();
+
+  console.log("LeafletMap routeData", routeData);
+
   return (
     <div
       className="h-screen w-full"

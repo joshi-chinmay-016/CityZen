@@ -5,7 +5,8 @@ MODULE: Safe Route Visualization Layer
 
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
+import type { LatLngTuple } from "leaflet";
 import { Polyline } from "react-leaflet";
 import type { RouteCoordinate } from "@/types/route";
 
@@ -15,7 +16,29 @@ type Props = {
 };
 
 export default function RouteLayer({ route, safe }: Props): React.ReactElement | null {
-  if (!route || route.length === 0) return null;
+  const positions = useMemo<LatLngTuple[]>(() => {
+    if (!Array.isArray(route)) {
+      return [];
+    }
+
+    return route.filter((coordinate): coordinate is RouteCoordinate => {
+      return (
+        Array.isArray(coordinate) &&
+        coordinate.length === 2 &&
+        typeof coordinate[0] === "number" &&
+        typeof coordinate[1] === "number" &&
+        Number.isFinite(coordinate[0]) &&
+        Number.isFinite(coordinate[1])
+      );
+    });
+  }, [route]);
+
+  console.log("RouteLayer routeData", route);
+  console.log("RouteLayer polyline positions", positions);
+
+  if (positions.length < 2) {
+    return null;
+  }
 
   const color = safe ? "#16a34a" : "#ef4444"; // green : red
 
@@ -27,5 +50,5 @@ export default function RouteLayer({ route, safe }: Props): React.ReactElement |
     lineCap: "round" as const,
   };
 
-  return <Polyline positions={route as [number, number][]} pathOptions={polylineOptions} />;
+  return <Polyline positions={positions} pathOptions={polylineOptions} />;
 }
