@@ -11,8 +11,10 @@ import { MapContainer, TileLayer } from "react-leaflet";
 import HeatmapLayer from "./HeatmapLayer";
 import CurrentLocation from "./CurrentLocation";
 import MarkerLayer from "./MarkerLayer";
+import RouteLayer from "./RouteLayer";
 
 const bangaloreCenter: [number, number] = [12.9716, 77.5946];
+
 
 export default function LeafletMap() {
   return (
@@ -40,6 +42,9 @@ export default function LeafletMap() {
 
         {/* Heatmap Layer */}
         <HeatmapLayer />
+        
+        {/* Safe Route Layer */}
+       
       </MapContainer>
       <SeverityLegend />
     </div>
