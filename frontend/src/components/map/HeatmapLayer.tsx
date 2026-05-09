@@ -1,60 +1,42 @@
+"use client";
+
 /*
 OWNER: Sushanth
 MODULE: Heatmap Visualization Layer
 */
 
-"use client";
-
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useMap } from "react-leaflet";
-import L, { type Layer } from "leaflet";
+import L from "leaflet";
 import "leaflet.heat";
 
 import { useHeatmap } from "@/hooks/useHeatmap";
 
-type HeatLayerOptions = {
-	radius: number;
-	blur: number;
-	maxZoom: number;
-};
-
-type LeafletHeatMap = typeof L & {
-	heatLayer: (
-		latlngs: Array<[number, number, number]>,
-		options: HeatLayerOptions
-	) => Layer;
-};
-
-const HEATMAP_OPTIONS: HeatLayerOptions = {
-	radius: 25,
-	blur: 15,
-	maxZoom: 17,
-};
-
 export default function HeatmapLayer() {
-	const map = useMap();
-	const { heatmapData, loading, error } = useHeatmap();
+  const map = useMap();
 
-	useEffect(() => {
-		if (loading || error || heatmapData.length === 0) {
-			return;
-		}
+  const { heatmapData } = useHeatmap();
 
-		const heatMap = (L as LeafletHeatMap).heatLayer(
-			heatmapData,
-			HEATMAP_OPTIONS
-		);
+  const heatLayerRef = useRef<any>(null);
 
-		heatMap.addTo(map);
+  useEffect(() => {
+    if (!heatmapData.length) return;
 
-		return () => {
-			heatMap.remove();
-		};
-	}, [map, heatmapData, loading, error]);
+    // Remove old layer safely
+    if (heatLayerRef.current) {
+      map.removeLayer(heatLayerRef.current);
+    }
 
-	if (loading || error || heatmapData.length === 0) {
-		return null;
-	}
+    // @ts-ignore
+    heatLayerRef.current = L.heatLayer(heatmapData, {
+      radius: 40,
+      blur: 20,
+      maxZoom: 17,
+      minOpacity: 0.4,
+    });
 
-	return null;
+    heatLayerRef.current.addTo(map);
+  }, [map, heatmapData]);
+
+  return null;
 }

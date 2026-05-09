@@ -28,7 +28,10 @@ export const useHeatmap = () => {
 			setError(null);
 
 			const response = await api.get<HeatmapResponse>("/heatmap");
-			setHeatmapData(response.data ?? []);
+
+            setHeatmapData(response.data ?? []);
+
+     
 		} catch (err) {
 			console.error("Failed to fetch heatmap data", err);
 			setError(getErrorMessage(err));

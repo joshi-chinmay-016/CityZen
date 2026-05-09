@@ -8,7 +8,7 @@ MODULE: Leaflet Client Map
 import "@/lib/leaflet";
 
 import { MapContainer, TileLayer } from "react-leaflet";
-
+import HeatmapLayer from "./HeatmapLayer";
 import CurrentLocation from "./CurrentLocation";
 import MarkerLayer from "./MarkerLayer";
 
@@ -37,6 +37,9 @@ export default function LeafletMap() {
 
         {/* Hazard Report Markers */}
         <MarkerLayer />
+
+        {/* Heatmap Layer */}
+        <HeatmapLayer />
       </MapContainer>
     </div>
   );
