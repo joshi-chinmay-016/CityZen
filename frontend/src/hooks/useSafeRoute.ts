@@ -44,11 +44,13 @@ export const useSafeRoute = () => {
           destination,
         };
 
+        console.log("useSafeRoute request URL", `${api.defaults.baseURL}/routes/safe-route`);
+
         const response = await api.post<SafeRouteResponse>(
           "/routes/safe-route",
           payload
         );
-
+        console.log("useSafeRoute backend response", response.data);
         setRouteData(response.data ?? null);
 
         return response.data;
