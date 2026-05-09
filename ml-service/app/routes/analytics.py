@@ -17,7 +17,6 @@ RESPONSIBILITIES:
 from fastapi import APIRouter
 
 from app.services.firestore_service import FirestoreService
-from app.utils.response_utils import success_response
 
 router = APIRouter()
 firestore_service = FirestoreService()
@@ -25,12 +24,20 @@ firestore_service = FirestoreService()
 
 @router.get("/")
 async def get_analytics():
-    data = firestore_service.get_heatmap_data()
-    total_predictions = len(data)
-    return success_response(
-        {
-            "total_predictions": total_predictions,
-            "heatmap_points": total_predictions,
-            "items": data,
+    try:
+        predictions = firestore_service._predictions  # access private for analytics
+        total_reports = len(predictions)
+        high_severity = sum(1 for p in predictions if p['severity'] == 'high')
+        potholes = sum(1 for p in predictions if p['hazard'] == 'pothole')
+        cracks = sum(1 for p in predictions if p['hazard'] == 'crack')
+        open_manholes = sum(1 for p in predictions if p['hazard'] == 'open_manhole')
+        
+        return {
+            "total_reports": total_reports,
+            "high_severity": high_severity,
+            "potholes": potholes,
+            "cracks": cracks,
+            "open_manholes": open_manholes
         }
-    )
+    except Exception as e:
+        return {"error": "Failed to get analytics", "details": str(e)}
