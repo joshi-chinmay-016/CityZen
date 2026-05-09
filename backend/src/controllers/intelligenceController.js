@@ -14,9 +14,73 @@ RESPONSIBILITIES:
 
 const reportService = require('../services/reportService');
 const { calculateStress, getGridKey, STRESS_WEIGHTS } = require('../utils/helpers');
+const { calculateDistance, isWithinRadius } = require('../utils/distanceCalculator');
 const axios = require('axios');
 
 const intelligenceController = {
+  /**
+   * Temporary endpoint for testing geographic distance utilities.
+   * 
+   * Expected body:
+   * {
+   *   "pointA": [lat, lng],
+   *   "pointB": [lat, lng],
+   *   "radius": 100
+   * }
+   */
+  testDistanceCalculation: async (req, res) => {
+    try {
+      const { pointA, pointB, radius } = req.body;
+
+      // Validate required inputs before performing distance calculations.
+      if (!Array.isArray(pointA) || !Array.isArray(pointB)) {
+        return res.status(400).json({
+          error: 'pointA and pointB must be arrays in [lat, lng] format'
+        });
+      }
+
+      if (pointA.length !== 2 || pointB.length !== 2) {
+        return res.status(400).json({
+          error: 'pointA and pointB must each contain exactly two values'
+        });
+      }
+
+      if (typeof radius !== 'number' || !Number.isFinite(radius) || radius < 0) {
+        return res.status(400).json({
+          error: 'radius must be a non-negative number'
+        });
+      }
+
+      const [latA, lngA] = pointA;
+      const [latB, lngB] = pointB;
+
+      if (
+        typeof latA !== 'number' ||
+        typeof lngA !== 'number' ||
+        typeof latB !== 'number' ||
+        typeof lngB !== 'number'
+      ) {
+        return res.status(400).json({
+          error: 'pointA and pointB values must be numbers'
+        });
+      }
+
+      // Calculate the distance and radius check using the geographic utility.
+      const distance = calculateDistance(latA, lngA, latB, lngB);
+      const withinRadius = isWithinRadius(latA, lngA, latB, lngB, radius);
+
+      return res.status(200).json({
+        distance_meters: distance,
+        within_radius: withinRadius
+      });
+    } catch (error) {
+      console.error('Distance calculation test failed:', error.message);
+      return res.status(500).json({
+        error: 'Failed to test distance calculation'
+      });
+    }
+  },
+
   simulate: async (req, res) => {
     try {
       const { lat, lng } = req.body;
