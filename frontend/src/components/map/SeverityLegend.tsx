@@ -9,7 +9,7 @@ import React from "react";
 
 export default function SeverityLegend(): React.ReactElement {
   return (
-    <div className="fixed bottom-4 right-4 z-50">
+    <div className="fixed bottom-4 right-4 z-40">
       <div className="bg-white/75 backdrop-blur-sm text-slate-900 text-sm shadow-md rounded-lg p-3 w-44 sm:w-48">
         <div className="font-semibold mb-2">Stress Legend</div>
 
