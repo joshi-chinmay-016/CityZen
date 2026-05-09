@@ -48,8 +48,6 @@ build/
 .storybook-out
 tmp/
 temp/
-__pycache__/
-*.py[cod]
 
 # Editor directories and files
 .vscode/
@@ -68,3 +66,20 @@ ehthumbs.db
 ._*
 .Spotlight-V100
 .Trashes
+
+# ML Service specific unwanted and secret files
+ml-service/__pycache__/
+ml-service/*.pyc
+ml-service/*.pyo
+ml-service/*.pyd
+ml-service/.Python
+ml-service/env/
+ml-service/venv/
+ml-service/.env
+ml-service/models/*.h5
+ml-service/models/*.pkl
+ml-service/models/*.joblib
+ml-service/models/*.onnx
+ml-service/logs/
+ml-service/checkpoints/
+
