@@ -14,8 +14,15 @@ RESPONSIBILITIES:
 
 const express = require('express');
 const router = express.Router();
-const heatmapController = require('../controllers/heatmapController');
+const { getHeatmap } = require('../controllers/heatmapController');
 
-router.get('/', heatmapController.getHeatmap);
+/**
+ * Heatmap API route
+ * GET /api/heatmap
+ * 
+ * Returns danger zone intensity data for frontend map visualization.
+ * Response format: [[latitude, longitude, intensity], ...]
+ */
+router.get('/heatmap', getHeatmap);
 
 module.exports = router;
