@@ -13,6 +13,7 @@ RESPONSIBILITIES:
 */
 
 const reportService = require('../services/reportService');
+const firestoreService = require('../services/firestoreService');
 const { calculateStress, getGridKey, STRESS_WEIGHTS } = require('../utils/helpers');
 const { calculateDistance, isWithinRadius } = require('../utils/distanceCalculator');
 const axios = require('axios');
@@ -78,6 +79,46 @@ const intelligenceController = {
       return res.status(500).json({
         error: 'Failed to test distance calculation'
       });
+    }
+  },
+
+  /**
+   * Analytics intelligence endpoint for dashboard visualization.
+   * 
+   * Returns aggregated statistics about hazard reports including:
+   * - total count of reports
+   * - distribution by hazard type
+   * - distribution by severity level
+   * - most commonly reported hazard
+   * 
+   * @route GET /api/intelligence/analytics
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   * @returns {Object} Analytics data object
+   */
+  getAnalytics: async (req, res) => {
+    try {
+      // Fetch analytics data from Firestore intelligence layer.
+      const analyticsData = await firestoreService.getAnalyticsData();
+
+      // Derive the most common hazard from the distribution.
+      let mostCommonHazard = null;
+      if (analyticsData.hazard_distribution && Object.keys(analyticsData.hazard_distribution).length > 0) {
+        mostCommonHazard = Object.keys(analyticsData.hazard_distribution).reduce((a, b) =>
+          analyticsData.hazard_distribution[a] > analyticsData.hazard_distribution[b] ? a : b
+        );
+      }
+
+      // Return analytics response with additional computed fields.
+      return res.status(200).json({
+        total_reports: analyticsData.total_reports,
+        hazard_distribution: analyticsData.hazard_distribution,
+        severity_distribution: analyticsData.severity_distribution,
+        most_common_hazard: mostCommonHazard
+      });
+    } catch (error) {
+      console.error('Error fetching analytics data:', error.message);
+      return res.status(500).json({ error: 'Failed to fetch analytics data' });
     }
   },
 
