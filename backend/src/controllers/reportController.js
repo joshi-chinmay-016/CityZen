@@ -13,6 +13,7 @@ RESPONSIBILITIES:
 */
 
 const reportService = require('../services/reportService');
+const { getAllReports } = require('../services/firestoreService');
 const { validateReportPayload, ALLOWED_REPORT_TYPES } = require('../validators/reportValidator');
 
 const reportController = {
@@ -37,7 +38,10 @@ const reportController = {
 
   getReports: async (req, res) => {
     try {
-      const reports = await reportService.getAllReports();
+      // Fetch normalized reports from the Firestore intelligence layer.
+      const reports = await getAllReports();
+
+      // Return standardized report documents for the frontend contract.
       return res.json(reports);
     } catch (err) {
       console.error("Error fetching reports:", err);

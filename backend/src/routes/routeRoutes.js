@@ -14,8 +14,19 @@ RESPONSIBILITIES:
 
 const express = require('express');
 const router = express.Router();
-const routeController = require('../controllers/routeController');
+const { testRouteGeneration, getSafeRoute } = require('../controllers/routeController');
 
-router.post('/safe-route', routeController.getSafeRoute);
+/**
+ * Test endpoint for OSRM route generation
+ * POST /api/routes/test-route
+ * Body: { "source": [lat, lng], "destination": [lat, lng] }
+ */
+router.post('/test-route', testRouteGeneration);
+
+/**
+ * Safe route calculation with stress analysis
+ * POST /api/routes/safe-route
+ */
+router.post('/safe-route', getSafeRoute);
 
 module.exports = router;
