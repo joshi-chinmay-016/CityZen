@@ -93,6 +93,7 @@ async function getRouteCoordinates(source, destination) {
     // coordinates: lng,lat;lng,lat (note: OSRM uses lng,lat order)
     // overview=full: get full route geometry
     // geometries=geojson: return geometry in GeoJSON format (array of [lng, lat])
+    // OSRM expects coordinates in lng,lat order. Convert here explicitly.
     const url = `${OSRM_BASE_URL}/route/v1/driving/${sourceLng},${sourceLat};${destLng},${destLat}?overview=full&geometries=geojson`;
 
     // Fetch route from OSRM API
@@ -144,9 +145,16 @@ async function getRouteCoordinates(source, destination) {
  * @deprecated Use getRouteCoordinates instead
  */
 async function getRoute(start, end) {
-  // Convert from { lat, lng } format to [lat, lng] format
-  const source = [start.lat, start.lng];
-  const destination = [end.lat, end.lng];
+  // Legacy helper: accept either objects { lat, lng } or arrays [lat, lng]
+  const toLatLng = (p) => {
+    if (!p) return [NaN, NaN];
+    if (Array.isArray(p) && p.length === 2) return [Number(p[0]), Number(p[1])];
+    if (typeof p === 'object' && p.lat !== undefined && p.lng !== undefined) return [Number(p.lat), Number(p.lng)];
+    return [NaN, NaN];
+  };
+
+  const source = toLatLng(start);
+  const destination = toLatLng(end);
   return getRouteCoordinates(source, destination);
 }
 
