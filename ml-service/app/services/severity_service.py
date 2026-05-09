@@ -20,7 +20,8 @@ class SeverityService:
             "pothole": "medium",
             "crack": "low",
             "debris": "high",
-            "flood": "critical"
+            "flood": "high",
+            "open_manhole": "high"
         }
 
     def map_severity(self, label: str) -> str:

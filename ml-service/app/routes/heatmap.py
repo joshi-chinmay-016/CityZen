@@ -17,7 +17,6 @@ RESPONSIBILITIES:
 from fastapi import APIRouter
 
 from app.services.firestore_service import FirestoreService
-from app.utils.response_utils import success_response
 
 router = APIRouter()
 firestore_service = FirestoreService()
@@ -25,4 +24,7 @@ firestore_service = FirestoreService()
 
 @router.get("/")
 async def get_heatmap():
-    return success_response(firestore_service.get_heatmap_data())
+    try:
+        return firestore_service.get_heatmap_data()
+    except Exception as e:
+        return {"error": "Failed to get heatmap", "details": str(e)}
