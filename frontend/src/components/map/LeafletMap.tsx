@@ -6,15 +6,25 @@ MODULE: Leaflet Client Map
 */
 
 import "@/lib/leaflet";
-
+import SeverityLegend from "./SeverityLegend";
 import { MapContainer, TileLayer } from "react-leaflet";
-
+import HeatmapLayer from "./HeatmapLayer";
 import CurrentLocation from "./CurrentLocation";
 import MarkerLayer from "./MarkerLayer";
+import RouteLayer from "./RouteLayer";
+import RouteInput from "./RouteInput";
+import useSafeRoute from "@/hooks/useSafeRoute";
 
 const bangaloreCenter: [number, number] = [12.9716, 77.5946];
 
+
 export default function LeafletMap() {
+  const {
+  routeData,
+  loading,
+  error,
+  fetchSafeRoute,
+} = useSafeRoute();
   return (
     <div
       className="h-screen w-full"
@@ -37,7 +47,22 @@ export default function LeafletMap() {
 
         {/* Hazard Report Markers */}
         <MarkerLayer />
+
+        {/* Heatmap Layer */}
+        <HeatmapLayer />
+        
+        {/* Safe Route Layer */}
+       <RouteLayer
+        route={routeData?.route ?? []}
+        safe={routeData?.safe ?? true}
+        />
       </MapContainer>
+      <SeverityLegend />
+      <RouteInput
+      loading={loading}
+      error={error}
+      fetchSafeRoute={fetchSafeRoute}
+      />
     </div>
   );
 }
