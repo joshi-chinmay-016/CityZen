@@ -8,10 +8,10 @@ import { useReports } from "@/hooks/useReports";
 import HazardPopup from "./HazardPopup";
 
 export default function MarkerLayer() {
-  const { reports, loading, error } = useReports();
+  const { reports, isLoading, error } = useReports();
 
   // Handle loading state
-  if (loading) {
+  if (isLoading) {
     return null;
   }
 

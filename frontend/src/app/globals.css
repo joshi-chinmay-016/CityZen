@@ -2,6 +2,10 @@
 Owned by Person 4
 MODULE: Global Styles
 */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 @import "leaflet/dist/leaflet.css";
 :root {
   color-scheme: light;

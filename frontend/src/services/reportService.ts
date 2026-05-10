@@ -1,22 +1,37 @@
-import api from "./api";
-import type { HazardReport, HazardType } from "../types/report";
+import api from './api';
 
-export type CreateReportPayload = {
+export interface Report {
+  id: string;
   latitude: number;
   longitude: number;
-  hazard: HazardType;
-};
+  hazard: string;
+  severity: 'Low' | 'Medium' | 'High' | 'Critical';
+  confidence: number;
+  timestamp: string;
+}
 
 export const reportService = {
-  getReports: async (): Promise<HazardReport[]> => {
-    const response = await api.get("/reports");
-    return response.data;
+  getReports: async (): Promise<Report[]> => {
+    try {
+      const response = await api.get<Report[]>('/reports');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching reports:', error);
+      throw error;
+    }
   },
 
-  createReport: async (
-    data: CreateReportPayload
-  ): Promise<{ id: string }> => {
-    const response = await api.post("/reports/report", data);
-    return response.data;
+  uploadReport: async (reportData: FormData): Promise<Report> => {
+    try {
+      const response = await api.post<Report>('/reports/upload', reportData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error uploading report:', error);
+      throw error;
+    }
   },
 };
