@@ -12,7 +12,7 @@ RESPONSIBILITIES:
 ====================================================
 """
 
-# MODULE: API Response Schemas
+# MODULE: API Response Schemas.
 
 from typing import Optional
 
