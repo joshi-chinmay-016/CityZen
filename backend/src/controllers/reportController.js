@@ -27,9 +27,27 @@ const reportController = {
         });
       }
 
-      const { lat, lng, type } = req.body;
-      const docRef = await reportService.createReport({ lat, lng, type });
-      return res.json({ id: docRef.id });
+      const { lat, lng, type, latitude, longitude, hazard, severity, confidence, description, timestamp } = req.body;
+      const normalizedTimestamp =
+        typeof timestamp === "string" && timestamp.trim()
+          ? timestamp
+          : new Date().toISOString();
+
+      const reportPayload = {
+        lat,
+        lng,
+        type,
+        latitude: Number.isFinite(Number(latitude)) ? Number(latitude) : lat,
+        longitude: Number.isFinite(Number(longitude)) ? Number(longitude) : lng,
+        hazard: typeof hazard === "string" && hazard.trim() ? hazard : type,
+        severity: typeof severity === "string" && severity.trim() ? severity : "Medium",
+        confidence: Number.isFinite(Number(confidence)) ? Number(confidence) : 90,
+        description: typeof description === "string" ? description : "",
+        timestamp: normalizedTimestamp,
+      };
+
+      const docRef = await reportService.createReport(reportPayload);
+      return res.json({ id: docRef.id, ...reportPayload });
     } catch (err) {
       console.error("Error adding report:", err);
       return res.status(500).json({ error: "Internal server error" });

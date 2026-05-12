@@ -163,7 +163,8 @@ const routeController = {
       return res.status(200).json({
         stress_score: data.stress_score,
         safe: data.safe,
-        route: data.route
+        route: data.route,
+        routes: data.routes || []
       });
     } catch (error) {
       console.error('Error calculating safe route:', error.message);

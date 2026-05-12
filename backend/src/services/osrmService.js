@@ -47,7 +47,7 @@ const TIMEOUT_MS = 5000;
  * const route = await getRouteCoordinates([40.7128, -74.0060], [40.7580, -73.9855]);
  * // Returns: { distance: 6500, duration: 420, coordinates: [[40.7128, -74.0060], ...] }
  */
-async function getRouteCoordinates(source, destination) {
+async function getRouteAlternatives(source, destination, maxAlternatives = 3) {
   try {
     // Validate input format
     if (
@@ -94,7 +94,7 @@ async function getRouteCoordinates(source, destination) {
     // overview=full: get full route geometry
     // geometries=geojson: return geometry in GeoJSON format (array of [lng, lat])
     // OSRM expects coordinates in lng,lat order. Convert here explicitly.
-    const url = `${OSRM_BASE_URL}/route/v1/driving/${sourceLng},${sourceLat};${destLng},${destLat}?overview=full&geometries=geojson`;
+    const url = `${OSRM_BASE_URL}/route/v1/driving/${sourceLng},${sourceLat};${destLng},${destLat}?overview=full&geometries=geojson&alternatives=true&steps=false`;
 
     // Fetch route from OSRM API
     const response = await axios.get(url, { timeout: TIMEOUT_MS });
@@ -106,29 +106,16 @@ async function getRouteCoordinates(source, destination) {
       );
     }
 
-    // Extract the first route (most direct)
-    const route = response.data.routes[0];
-    if (!route) {
+    const routes = Array.isArray(response.data.routes) ? response.data.routes.slice(0, maxAlternatives) : [];
+    if (!routes.length) {
       throw new Error('No route found between source and destination.');
     }
 
-    // Parse route data
-    const distance = route.distance; // meters
-    const duration = route.duration; // seconds
-
-    // Convert OSRM geometry from [lng, lat] to [lat, lng]
-    // OSRM returns geometry as GeoJSON format: [[lng, lat], [lng, lat], ...]
-    const coordinates = route.geometry.coordinates.map(([lng, lat]) => [
-      lat,
-      lng
-    ]);
-
-    // Return parsed route data
-    return {
-      distance,
-      duration,
-      coordinates
-    };
+    return routes.map((route) => ({
+      distance: route.distance,
+      duration: route.duration,
+      coordinates: route.geometry.coordinates.map(([lng, lat]) => [lat, lng])
+    }));
   } catch (error) {
     // Log error for debugging
     console.error('OSRM Service Error:', error.message);
@@ -155,11 +142,18 @@ async function getRoute(start, end) {
 
   const source = toLatLng(start);
   const destination = toLatLng(end);
-  return getRouteCoordinates(source, destination);
+  const routes = await getRouteAlternatives(source, destination, 1);
+  return routes[0];
+}
+
+async function getRouteCoordinates(source, destination) {
+  const routes = await getRouteAlternatives(source, destination, 1);
+  return routes[0];
 }
 
 // Export service methods
 const osrmService = {
+  getRouteAlternatives,
   getRouteCoordinates,
   getRoute
 };
