@@ -16,8 +16,8 @@ import HeatmapLayer from "./HeatmapLayer";
 import CurrentLocation from "./CurrentLocation";
 import MarkerLayer from "./MarkerLayer";
 import RouteLayer from "./RouteLayer";
-import MapSidebar from "./MapSidebar";
 import { useSafeRoute } from "@/hooks/useSafeRoute";
+import { classifyRouteRisk } from "@/types/route";
 
 const sourceIcon = new L.Icon({
   iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
@@ -42,10 +42,12 @@ const bangaloreCenter: [number, number] = [12.9716, 77.5946];
 function MapBridge({
   sourceCoords,
   destinationCoords,
+  activeRoute,
   onReady,
 }: {
   sourceCoords: [number, number] | null;
   destinationCoords: [number, number] | null;
+  activeRoute: [number, number][];
   onReady: (map: L.Map) => void;
 }) {
   const map = useMap();
@@ -55,6 +57,15 @@ function MapBridge({
   }, [map, onReady]);
 
   useEffect(() => {
+    if (activeRoute.length >= 2) {
+      map.fitBounds(L.latLngBounds(activeRoute), {
+        animate: true,
+        duration: 0.8,
+        padding: [48, 48],
+      });
+      return;
+    }
+
     if (sourceCoords && destinationCoords) {
       const bounds = L.latLngBounds([sourceCoords, destinationCoords]);
       map.fitBounds(bounds.pad(0.45), { animate: true, duration: 0.7 });
@@ -69,15 +80,17 @@ function MapBridge({
     if (destinationCoords) {
       map.flyTo(destinationCoords, 14, { duration: 0.7 });
     }
-  }, [destinationCoords, map, sourceCoords]);
+  }, [activeRoute, destinationCoords, map, sourceCoords]);
 
   return null;
 }
 
 export default function LeafletMap() {
-  const { routeResult, sourceCoords, destinationCoords } = useSafeRoute();
+  const { routeOptions, selectedRouteIndex, sourceCoords, destinationCoords } = useSafeRoute();
   const [showHeatmap, setShowHeatmap] = useState(true);
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
+
+  const activeRoute = routeOptions[selectedRouteIndex]?.route ?? [];
 
   const mapControls = useMemo(
     () => [
@@ -100,21 +113,25 @@ export default function LeafletMap() {
         icon: LocateFixed,
         label: "Center on current location",
         onClick: () => {
+          if (activeRoute.length >= 2) {
+            mapInstance?.fitBounds(L.latLngBounds(activeRoute), { padding: [48, 48], animate: true });
+            return;
+          }
+
           if (sourceCoords) {
             mapInstance?.flyTo(sourceCoords, 14, { duration: 0.7 });
             return;
           }
+
           mapInstance?.flyTo(bangaloreCenter, 13, { duration: 0.7 });
         },
       },
     ],
-    [mapInstance, sourceCoords]
+    [activeRoute, mapInstance, sourceCoords]
   );
 
   return (
     <div className="relative h-screen w-full">
-      <MapSidebar />
-
       <MapContainer
         center={bangaloreCenter}
         zoom={13}
@@ -127,7 +144,12 @@ export default function LeafletMap() {
           attribution="© OpenStreetMap contributors"
         />
 
-        <MapBridge sourceCoords={sourceCoords} destinationCoords={destinationCoords} onReady={setMapInstance} />
+        <MapBridge
+          sourceCoords={sourceCoords}
+          destinationCoords={destinationCoords}
+          activeRoute={activeRoute}
+          onReady={setMapInstance}
+        />
 
         <CurrentLocation />
         <MarkerLayer />
@@ -145,7 +167,14 @@ export default function LeafletMap() {
           </Marker>
         ) : null}
 
-        <RouteLayer route={routeResult?.route ?? []} safe={routeResult?.safe ?? true} />
+        {routeOptions.map((route, index) => (
+          <RouteLayer
+            key={route.id ?? `route-layer-${index}`}
+            route={route.route ?? []}
+            variant={classifyRouteRisk(route)}
+            selected={index === selectedRouteIndex}
+          />
+        ))}
       </MapContainer>
 
       <motion.div

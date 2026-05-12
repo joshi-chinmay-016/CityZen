@@ -55,6 +55,7 @@ export default function Navbar() {
     return exact?.href ?? "/";
   }, [pathname]);
   const forceSolid = pathname === "/map";
+  const safetyStatus = liveCount > 2875 ? "Monitoring stable" : "Sensors rebalancing";
 
   return (
     <nav className="fixed inset-x-0 top-0 z-[2100] px-4 pt-4 md:px-6">
@@ -111,11 +112,19 @@ export default function Navbar() {
           </div>
 
           <div className="hidden items-center gap-3 md:flex">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.03] px-3 py-2 text-sm text-white/55">
-              <Activity className="h-4 w-4 text-emerald-300" />
-              <span className="font-mono text-white/78">{liveCount.toLocaleString()}</span>
-              <span>live</span>
-            </div>
+            {pathname !== "/map" ? (
+              <>
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.03] px-3 py-2 text-sm text-white/55">
+                  <Activity className="h-4 w-4 text-emerald-300" />
+                  <span className="font-mono text-white/78">{liveCount.toLocaleString()}</span>
+                  <span>live</span>
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/14 bg-emerald-500/8 px-3 py-2 text-sm text-emerald-100/80">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.7)]" />
+                  <span>{safetyStatus}</span>
+                </div>
+              </>
+            ) : null}
             <button className="rounded-full border border-emerald-400/18 bg-emerald-500/8 px-4 py-2 text-sm text-emerald-200 transition-colors hover:bg-emerald-500/12">
               Sign in
             </button>

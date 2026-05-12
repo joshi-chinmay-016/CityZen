@@ -8,14 +8,21 @@ MODULE: Safe Route Visualization Layer
 import React, { useMemo } from "react";
 import type { LatLngTuple } from "leaflet";
 import { Polyline } from "react-leaflet";
-import type { RouteCoordinate } from "@/types/route";
+import { RouteCoordinate, RouteRiskLevel } from "@/types/route";
 
 type Props = {
   route: RouteCoordinate[];
-  safe: boolean;
+  variant: RouteRiskLevel;
+  selected?: boolean;
 };
 
-export default function RouteLayer({ route, safe }: Props): React.ReactElement | null {
+const routeColors: Record<RouteRiskLevel, string> = {
+  safe: "#10b981",
+  moderate: "#f59e0b",
+  risky: "#f43f5e",
+};
+
+export default function RouteLayer({ route, variant, selected = false }: Props): React.ReactElement | null {
   const positions = useMemo<LatLngTuple[]>(() => {
     if (!Array.isArray(route)) {
       return [];
@@ -33,22 +40,21 @@ export default function RouteLayer({ route, safe }: Props): React.ReactElement |
     });
   }, [route]);
 
-  console.log("RouteLayer routeData", route);
-  console.log("RouteLayer polyline positions", positions);
-
   if (positions.length < 2) {
     return null;
   }
 
-  const color = safe ? "#16a34a" : "#ef4444"; // green : red
-
-  const polylineOptions = {
-    color,
-    weight: 6,
-    opacity: 0.8,
-    lineJoin: "round" as const,
-    lineCap: "round" as const,
-  };
-
-  return <Polyline positions={positions} pathOptions={polylineOptions} />;
+  return (
+    <Polyline
+      positions={positions}
+      pathOptions={{
+        color: routeColors[variant],
+        weight: selected ? 7 : 4,
+        opacity: selected ? 0.95 : 0.32,
+        dashArray: selected ? undefined : "10 12",
+        lineJoin: "round",
+        lineCap: "round",
+      }}
+    />
+  );
 }
