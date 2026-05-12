@@ -36,10 +36,11 @@ const TIMEOUT_MS = 5000;
  * @param {number[]} source - Starting point [latitude, longitude]
  * @param {number[]} destination - Ending point [latitude, longitude]
  * 
- * @returns {Promise<Object>} Route object containing:
- *   - distance: Route distance in meters
- *   - duration: Estimated travel time in seconds
- *   - coordinates: Array of [lat, lng] points along the route
+ * @returns {Promise<Object>} Route response containing:
+ *   - routes: Array of analyzed route candidates from OSRM
+ *   - distance: Legacy best-route distance in meters
+ *   - duration: Legacy best-route duration in seconds
+ *   - coordinates: Legacy best-route geometry as [lat, lng]
  * 
  * @throws {Error} If API request fails or response is invalid
  * 
@@ -91,10 +92,11 @@ async function getRouteCoordinates(source, destination) {
     // Format: /route/v1/{profile}/{coordinates}?options
     // profile: driving
     // coordinates: lng,lat;lng,lat (note: OSRM uses lng,lat order)
+    // alternatives=true: request OSRM alternate routes for comparison
     // overview=full: get full route geometry
     // geometries=geojson: return geometry in GeoJSON format (array of [lng, lat])
     // OSRM expects coordinates in lng,lat order. Convert here explicitly.
-    const url = `${OSRM_BASE_URL}/route/v1/driving/${sourceLng},${sourceLat};${destLng},${destLat}?overview=full&geometries=geojson`;
+    const url = `${OSRM_BASE_URL}/route/v1/driving/${sourceLng},${sourceLat};${destLng},${destLat}?alternatives=true&overview=full&geometries=geojson`;
 
     // Fetch route from OSRM API
     const response = await axios.get(url, { timeout: TIMEOUT_MS });
@@ -106,28 +108,39 @@ async function getRouteCoordinates(source, destination) {
       );
     }
 
-    // Extract the first route (most direct)
-    const route = response.data.routes[0];
-    if (!route) {
+    // Extract all alternate routes returned by OSRM.
+    const routes = Array.isArray(response.data.routes) ? response.data.routes : [];
+    if (routes.length === 0) {
       throw new Error('No route found between source and destination.');
     }
 
-    // Parse route data
-    const distance = route.distance; // meters
-    const duration = route.duration; // seconds
+    // Parse route data for each OSRM candidate.
+    const parsedRoutes = routes.map((route) => {
+      const distance = route.distance; // meters
+      const duration = route.duration; // seconds
 
-    // Convert OSRM geometry from [lng, lat] to [lat, lng]
-    // OSRM returns geometry as GeoJSON format: [[lng, lat], [lng, lat], ...]
-    const coordinates = route.geometry.coordinates.map(([lng, lat]) => [
-      lat,
-      lng
-    ]);
+      // Convert OSRM geometry from [lng, lat] to [lat, lng].
+      // OSRM returns geometry as GeoJSON format: [[lng, lat], [lng, lat], ...]
+      const coordinates = Array.isArray(route?.geometry?.coordinates)
+        ? route.geometry.coordinates.map(([lng, lat]) => [lat, lng])
+        : [];
 
-    // Return parsed route data
+      return {
+        distance,
+        duration,
+        coordinates
+      };
+    });
+
+    // Preserve legacy single-route fields using the best available candidate.
+    const bestRoute = parsedRoutes[0];
+
+    // Return parsed route data.
     return {
-      distance,
-      duration,
-      coordinates
+      routes: parsedRoutes,
+      distance: bestRoute.distance,
+      duration: bestRoute.duration,
+      coordinates: bestRoute.coordinates
     };
   } catch (error) {
     // Log error for debugging
