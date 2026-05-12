@@ -1,5 +1,5 @@
-import api from './api';
-import { RouteCoordinate } from '@/types/route';
+import api from "./api";
+import { SafeRouteResponse } from "@/types/route";
 
 export interface RouteRequest {
   startLat: number;
@@ -12,36 +12,19 @@ export interface RouteRequest {
   };
 }
 
-export interface SafeRouteResponse {
-  id?: string;
-  stress_score: number;
-  safe: boolean;
-  route: RouteCoordinate[];
-  distance_meters?: number;
-  duration_seconds?: number;
-  hazards?: number;
-  routes?: Array<{
-    id: string;
-    stress_score: number;
-    safe: boolean;
-    route: RouteCoordinate[];
-    distance_meters: number;
-    duration_seconds: number;
-    hazards: number;
-  }>;
-}
+export { type SafeRouteResponse } from "@/types/route";
 
 export const routeService = {
   getSafeRoute: async (params: RouteRequest): Promise<SafeRouteResponse> => {
     try {
-      const response = await api.post<SafeRouteResponse>('/routes/safe-route', {
+      const response = await api.post<SafeRouteResponse>("/routes/safe-route", {
         source: [params.startLat, params.startLng],
         destination: [params.endLat, params.endLng],
         preferences: params.preferences,
       });
       return response.data;
     } catch (error) {
-      console.error('Error calculating safe route:', error);
+      console.error("Error calculating safe route:", error);
       throw error;
     }
   },
