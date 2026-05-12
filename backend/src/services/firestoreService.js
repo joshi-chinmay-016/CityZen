@@ -105,12 +105,20 @@ const normalizeNumber = (value, fallback = null) => {
  */
 const normalizeReport = (report = {}) => {
   // Active schema (ML writes these fields directly)
-  const latitude = Number(report.latitude);
-  const longitude = Number(report.longitude);
-  const hazard = String(report.hazard || 'unknown').toLowerCase();
+  const latitude = Number(report.latitude ?? report.lat);
+  const longitude = Number(report.longitude ?? report.lng);
+  const hazard = String(report.hazard || report.type || 'unknown').toLowerCase();
   const severity = String(report.severity || 'medium').toLowerCase();
   const confidence = Number(report.confidence ?? 1);
-  const timestamp = String(report.timestamp || new Date().toISOString());
+  const rawTimestamp = report.timestamp;
+  const timestamp =
+    typeof rawTimestamp === 'string'
+      ? rawTimestamp
+      : typeof rawTimestamp?.toDate === 'function'
+        ? rawTimestamp.toDate().toISOString()
+        : typeof rawTimestamp === 'number'
+          ? new Date(rawTimestamp).toISOString()
+          : new Date().toISOString();
 
   return {
     id: report.id ? String(report.id) : '',

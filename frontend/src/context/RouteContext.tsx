@@ -5,12 +5,15 @@ import { routeService, RouteRequest, SafeRouteResponse } from '@/services/routeS
 
 interface RouteContextType {
   routeResult: SafeRouteResponse | null;
+  routeOptions: SafeRouteResponse[];
+  selectedRouteIndex: number;
   isLoading: boolean;
   error: string | null;
   sourceCoords: [number, number] | null;
   destinationCoords: [number, number] | null;
   setSourceCoords: (coords: [number, number] | null) => void;
   setDestinationCoords: (coords: [number, number] | null) => void;
+  setSelectedRouteIndex: (index: number) => void;
   fetchSafeRoute: (params: RouteRequest) => Promise<void>;
   resetRoute: () => void;
 }
@@ -19,6 +22,8 @@ const RouteContext = createContext<RouteContextType | undefined>(undefined);
 
 export function RouteProvider({ children }: { children: ReactNode }) {
   const [routeResult, setRouteResult] = useState<SafeRouteResponse | null>(null);
+  const [routeOptions, setRouteOptions] = useState<SafeRouteResponse[]>([]);
+  const [selectedRouteIndex, setSelectedRouteIndexState] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [sourceCoords, setSourceCoords] = useState<[number, number] | null>(null);
@@ -31,7 +36,10 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       const data = await routeService.getSafeRoute(params);
       
       if (data && Array.isArray(data.route)) {
-        setRouteResult(data);
+        const options = Array.isArray(data.routes) && data.routes.length ? data.routes : [data];
+        setRouteOptions(options);
+        setSelectedRouteIndexState(0);
+        setRouteResult(options[0]);
       } else {
         throw new Error('Invalid route data received from server.');
       }
@@ -44,8 +52,20 @@ export function RouteProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const setSelectedRouteIndex = useCallback((index: number) => {
+    setSelectedRouteIndexState(index);
+    setRouteResult((current) => {
+      if (!routeOptions[index]) {
+        return current;
+      }
+      return routeOptions[index];
+    });
+  }, [routeOptions]);
+
   const resetRoute = useCallback(() => {
     setRouteResult(null);
+    setRouteOptions([]);
+    setSelectedRouteIndexState(0);
     setError(null);
     setIsLoading(false);
   }, []);
@@ -53,12 +73,15 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   return (
     <RouteContext.Provider value={{ 
       routeResult, 
+      routeOptions,
+      selectedRouteIndex,
       isLoading, 
       error, 
       sourceCoords, 
       destinationCoords, 
       setSourceCoords, 
       setDestinationCoords, 
+      setSelectedRouteIndex,
       fetchSafeRoute, 
       resetRoute 
     }}>

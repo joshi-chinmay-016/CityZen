@@ -148,9 +148,6 @@ const routeStressService = {
       }
 
       // 1) Get route geometry from OSRM in [lat, lng] format.
-      const routeData = await osrmService.getRouteCoordinates(source, destination);
-      const routeCoordinates = Array.isArray(routeData.coordinates) ? routeData.coordinates : [];
-
       // 2) Pull normalized hazard reports from Firestore intelligence layer.
       const reports = await firestoreService.getAllReports();
       // ======================================================
@@ -161,15 +158,40 @@ const routeStressService = {
 
       // console.log("REPORTS:", reports);
 
-      // 3) Find hazards within 100m of the route and score risk.
-      const nearbyHazards = findNearbyHazards(routeCoordinates, reports, HAZARD_SEARCH_RADIUS_METERS);
-      const stressScore = calculateStressScore(nearbyHazards);
+      // 3) Fetch route alternatives and score each route.
+      const routeCandidates = await osrmService.getRouteAlternatives(source, destination, 3);
+      const scoredRoutes = routeCandidates.map((routeData, index) => {
+        const routeCoordinates = Array.isArray(routeData.coordinates) ? routeData.coordinates : [];
+        const nearbyHazards = findNearbyHazards(routeCoordinates, reports, HAZARD_SEARCH_RADIUS_METERS);
+        const stressScore = calculateStressScore(nearbyHazards);
+
+        return {
+          id: `route-${index + 1}`,
+          stress_score: stressScore,
+          safe: stressScore < SAFE_THRESHOLD,
+          route: routeCoordinates,
+          distance_meters: routeData.distance,
+          duration_seconds: routeData.duration,
+          hazards: nearbyHazards.length
+        };
+      }).sort((a, b) => {
+        if (a.stress_score !== b.stress_score) {
+          return a.stress_score - b.stress_score;
+        }
+        return a.duration_seconds - b.duration_seconds;
+      });
+
+      const bestRoute = scoredRoutes[0];
+      if (!bestRoute) {
+        throw new Error('No viable routes returned from routing service.');
+      }
 
       // 4) Route safety classification for frontend contract.
       return {
-        stress_score: stressScore,
-        safe: stressScore < SAFE_THRESHOLD,
-        route: routeCoordinates
+        stress_score: bestRoute.stress_score,
+        safe: bestRoute.safe,
+        route: bestRoute.route,
+        routes: scoredRoutes
       };
     } catch (error) {
       console.error('Error calculating route stress:', error.message);
