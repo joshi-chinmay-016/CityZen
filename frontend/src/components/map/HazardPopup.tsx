@@ -11,12 +11,14 @@ interface HazardPopupProps {
 
 const getSeverityColor = (severity: HazardSeverity): string => {
   switch (severity) {
-    case "low":
+    case "Low":
       return "bg-blue-100 border-blue-300 text-blue-900";
-    case "medium":
+    case "Medium":
       return "bg-yellow-100 border-yellow-300 text-yellow-900";
-    case "high":
+    case "High":
       return "bg-red-100 border-red-300 text-red-900";
+    case "Critical":
+      return "bg-rose-100 border-rose-300 text-rose-900";
     default:
       return "bg-gray-100 border-gray-300 text-gray-900";
   }
@@ -24,12 +26,14 @@ const getSeverityColor = (severity: HazardSeverity): string => {
 
 const getSeverityBadgeColor = (severity: HazardSeverity): string => {
   switch (severity) {
-    case "low":
+    case "Low":
       return "bg-blue-500 text-white";
-    case "medium":
+    case "Medium":
       return "bg-yellow-500 text-white";
-    case "high":
+    case "High":
       return "bg-red-500 text-white";
+    case "Critical":
+      return "bg-rose-500 text-white";
     default:
       return "bg-gray-500 text-white";
   }
@@ -59,6 +63,7 @@ const formatTimestamp = (timestamp: string): string => {
 };
 
 const formatHazardType = (hazardType: string): string => {
+  if (!hazardType) return "Unknown";
   return hazardType.charAt(0).toUpperCase() + hazardType.slice(1);
 };
 
@@ -92,11 +97,11 @@ export default function HazardPopup({ report }: HazardPopupProps) {
         <div className="w-full bg-black bg-opacity-10 rounded-full h-2">
           <div
             className={`h-2 rounded-full ${badgeColor}`}
-            style={{ width: `${report.confidence * 100}%` }}
+            style={{ width: `${report.confidence}%` }}
           ></div>
         </div>
         <p className="text-sm font-semibold mt-1">
-          {(report.confidence * 100).toFixed(0)}%
+          {report.confidence}%
         </p>
       </div>
 

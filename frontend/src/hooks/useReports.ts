@@ -1,49 +1,51 @@
-/*
-====================================================
-OWNER: Sushanth
-MODULE: Maps & Route Visualization
+import { useState, useEffect, useCallback } from 'react';
+import { reportService, Report } from '@/services/reportService';
 
-RESPONSIBILITIES:
-- Map Rendering
-- Heatmaps
-- Route Visualization
-- Current Location Tracking
-- Report Markers
-====================================================
-*/
+interface UseReportsResult {
+  reports: Report[];
+  isLoading: boolean;
+  error: string | null;
+  refetch: () => Promise<void>;
+}
 
-import { useState, useEffect } from "react";
-import { reportService } from "../services/reportService";
-import type { HazardReport } from "../types/report";
-
-export const useReports = () => {
-  const [reports, setReports] = useState<HazardReport[]>([]);
-  const [loading, setLoading] = useState(true);
+export function useReports(pollingIntervalMs: number = 5000): UseReportsResult {
+  const [reports, setReports] = useState<Report[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchReports = async () => {
+  const fetchReports = useCallback(async (isBackground: boolean = false) => {
+    if (!isBackground) setIsLoading(true);
     try {
-      setLoading(true);
-      setError(null);
-
       const data = await reportService.getReports();
-      setReports(data);
-    } catch (err) {
-      console.error("Failed to fetch reports", err);
-      setError("Failed to fetch reports");
+      // Ensure data is an array to prevent UI crashes
+      setReports(Array.isArray(data) ? data : []);
+      setError(null);
+    } catch (err: any) {
+      console.error('[useReports Hook Error]:', err);
+      // Graceful error handling: preserve previous reports if background refresh fails
+      if (!isBackground) {
+        setError(err.message || 'Failed to fetch reports. Please try again.');
+        setReports([]); // Reset on manual/initial fetch failure
+      }
     } finally {
-      setLoading(false);
+      if (!isBackground) setIsLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchReports();
   }, []);
 
-  return {
-    reports,
-    loading,
-    error,
-    refresh: fetchReports,
-  };
-};
+  useEffect(() => {
+    // Initial fetch
+    fetchReports();
+
+    // Set up polling
+    if (pollingIntervalMs > 0) {
+      const intervalId = setInterval(() => {
+        fetchReports(true);
+      }, pollingIntervalMs);
+
+      // Cleanup on unmount
+      return () => clearInterval(intervalId);
+    }
+  }, [fetchReports, pollingIntervalMs]);
+
+  return { reports, isLoading, error, refetch: () => fetchReports(false) };
+}

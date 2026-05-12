@@ -1,54 +1,51 @@
-/*
-OWNER: Sushanth
-MODULE: Heatmap Data Hook
-*/
+import { useState, useEffect, useCallback } from 'react';
+import { heatmapService, HeatmapDataPoint } from '@/services/heatmapService';
 
-import { useCallback, useEffect, useState } from "react";
-import { api } from "../services/api";
-import type { HeatmapResponse } from "../types/heatmap";
+interface UseHeatmapResult {
+  heatmapData: HeatmapDataPoint[];
+  isLoading: boolean;
+  error: string | null;
+  refetch: () => Promise<void>;
+}
 
-const DEFAULT_ERROR_MESSAGE = "Failed to fetch heatmap data";
+export function useHeatmap(pollingIntervalMs: number = 5000): UseHeatmapResult {
+  const [heatmapData, setHeatmapData] = useState<HeatmapDataPoint[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-const getErrorMessage = (error: unknown): string => {
-	if (error instanceof Error && error.message) {
-		return error.message;
-	}
+  const fetchHeatmapData = useCallback(async (isBackground: boolean = false) => {
+    if (!isBackground) setIsLoading(true);
+    try {
+      const data = await heatmapService.getHeatmapData();
+      // Ensure data is an array to prevent UI crashes
+      setHeatmapData(Array.isArray(data) ? data : []);
+      setError(null);
+    } catch (err: any) {
+      console.error('[useHeatmap Hook Error]:', err);
+      // Graceful error handling: preserve previous data if background refresh fails
+      if (!isBackground) {
+        setError(err.message || 'Failed to fetch heatmap data. Please try again.');
+        setHeatmapData([]); // Reset on manual/initial fetch failure
+      }
+    } finally {
+      if (!isBackground) setIsLoading(false);
+    }
+  }, []);
 
-	return DEFAULT_ERROR_MESSAGE;
-};
+  useEffect(() => {
+    // Initial fetch
+    fetchHeatmapData();
 
-export const useHeatmap = () => {
-	const [heatmapData, setHeatmapData] = useState<HeatmapResponse>([]);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
+    // Set up polling
+    if (pollingIntervalMs > 0) {
+      const intervalId = setInterval(() => {
+        fetchHeatmapData(true);
+      }, pollingIntervalMs);
 
-	const fetchHeatmapData = useCallback(async () => {
-		try {
-			setLoading(true);
-			setError(null);
+      // Cleanup on unmount
+      return () => clearInterval(intervalId);
+    }
+  }, [fetchHeatmapData, pollingIntervalMs]);
 
-			const response = await api.get<HeatmapResponse>("/heatmap");
-
-            setHeatmapData(response.data ?? []);
-
-     
-		} catch (err) {
-			console.error("Failed to fetch heatmap data", err);
-			setError(getErrorMessage(err));
-			setHeatmapData([]);
-		} finally {
-			setLoading(false);
-		}
-	}, []);
-
-	useEffect(() => {
-		void fetchHeatmapData();
-	}, [fetchHeatmapData]);
-
-	return {
-		heatmapData,
-		loading,
-		error,
-		refresh: fetchHeatmapData,
-	};
-};
+  return { heatmapData, isLoading, error, refetch: () => fetchHeatmapData(false) };
+}

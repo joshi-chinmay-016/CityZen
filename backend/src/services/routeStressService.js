@@ -184,8 +184,8 @@ const routeStressService = {
       }
 
       // 1) Get route geometry from OSRM in [lat, lng] format.
-      //    OSRM now returns alternate routes so each path can be scored separately.
-      const routeData = await osrmService.getRouteCoordinates(source, destination);
+      //    Request alternate routes so each path can be scored separately.
+      const routeCandidates = await osrmService.getRouteAlternatives(source, destination, 3);
 
       // 2) Pull normalized hazard reports from Firestore intelligence layer.
       const reports = await firestoreService.getAllReports();
@@ -197,16 +197,8 @@ const routeStressService = {
 
       // console.log("REPORTS:", reports);
 
-      const osrmRoutes = Array.isArray(routeData.routes) && routeData.routes.length > 0
-        ? routeData.routes
-        : [{
-            distance: routeData.distance,
-            duration: routeData.duration,
-            coordinates: Array.isArray(routeData.coordinates) ? routeData.coordinates : []
-          }];
-
       // 3) Score every alternate route independently, then sort by stress.
-      const routes = osrmRoutes
+      const routes = (Array.isArray(routeCandidates) ? routeCandidates : [])
         .map((route) => analyzeRouteCandidate(route, reports))
         .sort((left, right) => left.stress_score - right.stress_score);
 
