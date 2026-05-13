@@ -68,6 +68,9 @@ ehthumbs.db
 .Trashes
 
 # ML Service specific unwanted and secret files
+__pycache__/
+*.py[cod]
+*.pyd
 ml-service/__pycache__/
 ml-service/*.pyc
 ml-service/*.pyo
