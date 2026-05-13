@@ -6,6 +6,7 @@ MODULE: Hazard Report Marker Layer
 import { Marker, Popup } from "react-leaflet";
 import { useReports } from "@/hooks/useReports";
 import HazardPopup from "./HazardPopup";
+import { getHazardIcon } from '@/lib/markerIcons';
 
 export default function MarkerLayer() {
   const { reports, isLoading, error } = useReports();
@@ -39,8 +40,11 @@ export default function MarkerLayer() {
       {validReports.map((report) => {
         const lat = Number((report as any).latitude);
         const lng = Number((report as any).longitude);
+        const hazardType = (report as any).hazard as string | undefined;
+        const icon = getHazardIcon(hazardType);
+
         return (
-          <Marker key={report.id} position={[lat, lng]}>
+          <Marker key={report.id} position={[lat, lng]} icon={icon}>
             <Popup>
               <HazardPopup report={report} />
             </Popup>
