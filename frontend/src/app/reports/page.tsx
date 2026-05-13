@@ -107,21 +107,43 @@ export default function ReportsPage() {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
+      if (!coords) {
+        toast.error('Please detect your location first so the AI can geotag the report.');
+        return;
+      }
+
+      const file = e.target.files[0];
       setUploadProgress(10);
-      // Simulate upload and AI verification
-      let progress = 10;
-      const interval = setInterval(() => {
-        progress += 15;
-        setUploadProgress(progress);
-        if (progress >= 100) {
-          clearInterval(interval);
+      setAiVerified(false);
+      setStep(1);
+
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('latitude', coords[0].toString());
+        formData.append('longitude', coords[1].toString());
+
+        setUploadProgress(30);
+        const result = await reportService.uploadReport(formData);
+        setUploadProgress(100);
+
+        if (result && result.predictions && result.predictions.length > 0) {
+          const prediction = result.predictions[0];
+          setHazardType(prediction.label || 'pothole');
           setAiVerified(true);
           setStep(2);
-          toast.success('AI Verification Complete: 98% Confidence');
+          toast.success(`AI Verified: ${prediction.label} detected with ${Math.round(prediction.confidence * 100)}% confidence`);
+        } else {
+          setAiVerified(false);
+          toast.error('AI could not confidently identify a hazard in this image.');
         }
-      }, 500);
+      } catch (err) {
+        console.error('AI Verification failed:', err);
+        setUploadProgress(0);
+        toast.error('AI Verification service unavailable.');
+      }
     }
   };
 
@@ -131,6 +153,8 @@ export default function ReportsPage() {
     
     setIsSubmitting(true);
     try {
+      // The ML service already saves the report if called via uploadReport
+      // But we call createReport here to ensure it's finalized with user-provided description/severity
       await reportService.createReport({
         type: hazardType,
         severity,
@@ -139,8 +163,9 @@ export default function ReportsPage() {
         longitude: coords[1],
         imageUrl: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?q=80&w=1470&auto=format&fit=crop'
       });
-      toast.success('Report submitted successfully!');
+      toast.success('Report synchronized to safety map!');
       setStep(4);
+      
       // Reset form after a delay
       setTimeout(() => {
         setStep(1);
@@ -151,7 +176,7 @@ export default function ReportsPage() {
         setCoords(null);
       }, 5000);
     } catch (error) {
-      toast.error('Failed to submit report');
+      toast.error('Failed to sync report to map');
     } finally {
       setIsSubmitting(false);
     }

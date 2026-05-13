@@ -1,0 +1,92 @@
+[
+  {
+    "id": "c1",
+    "latitude": 12.9716,
+    "longitude": 77.5946,
+    "hazard": "pothole",
+    "severity": "high",
+    "confidence": 0.95,
+    "timestamp": "2026-05-14T01:00:00Z"
+  },
+  {
+    "id": "c2",
+    "latitude": 12.9800,
+    "longitude": 77.6000,
+    "hazard": "manhole",
+    "severity": "medium",
+    "confidence": 0.88,
+    "timestamp": "2026-05-14T01:15:00Z"
+  },
+  {
+    "id": "c3",
+    "latitude": 12.9650,
+    "longitude": 77.5850,
+    "hazard": "crack",
+    "severity": "low",
+    "confidence": 0.92,
+    "timestamp": "2026-05-14T01:30:00Z"
+  },
+  {
+    "id": "c4",
+    "latitude": 12.9750,
+    "longitude": 77.5910,
+    "hazard": "pothole",
+    "severity": "medium",
+    "confidence": 0.85,
+    "timestamp": "2026-05-14T01:45:00Z"
+  },
+  {
+    "id": "c5",
+    "latitude": 12.9785,
+    "longitude": 77.5975,
+    "hazard": "manhole",
+    "severity": "high",
+    "confidence": 0.98,
+    "timestamp": "2026-05-14T02:00:00Z"
+  },
+  {
+    "id": "c6",
+    "latitude": 12.9680,
+    "longitude": 77.6050,
+    "hazard": "crack",
+    "severity": "medium",
+    "confidence": 0.80,
+    "timestamp": "2026-05-14T02:15:00Z"
+  },
+  {
+    "id": "c7",
+    "latitude": 12.9820,
+    "longitude": 77.5890,
+    "hazard": "pothole",
+    "severity": "low",
+    "confidence": 0.75,
+    "timestamp": "2026-05-14T02:30:00Z"
+  },
+  {
+    "id": "c8",
+    "latitude": 12.9730,
+    "longitude": 77.6010,
+    "hazard": "manhole",
+    "severity": "medium",
+    "confidence": 0.90,
+    "timestamp": "2026-05-14T02:45:00Z"
+  },
+  {
+    "id": "c9",
+    "latitude": 12.9695,
+    "longitude": 77.5925,
+    "hazard": "pothole",
+    "severity": "high",
+    "confidence": 0.94,
+    "timestamp": "2026-05-14T03:00:00Z"
+  },
+  {
+    "id": "c10",
+    "latitude": 12.9760,
+    "longitude": 77.5995,
+    "hazard": "crack",
+    "severity": "low",
+    "confidence": 0.82,
+    "timestamp": "2026-05-14T03:15:00Z"
+  }
+]

@@ -7,7 +7,7 @@ MODULE: Leaflet Client Map
 
 import "@/lib/leaflet";
 import SeverityLegend from "./SeverityLegend";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, ZoomControl } from "react-leaflet";
 import HeatmapLayer from "./HeatmapLayer";
 import CurrentLocation from "./CurrentLocation";
 import MarkerLayer from "./MarkerLayer";
@@ -40,6 +40,8 @@ const destIcon = new L.Icon({
 const bangaloreCenter: [number, number] = [12.9716, 77.5946];
 
 
+import MapSidebar from "./MapSidebar";
+
 export default function LeafletMap() {
   const {
   routeResult,
@@ -64,9 +66,11 @@ export default function LeafletMap() {
         center={bangaloreCenter}
         zoom={13}
         scrollWheelZoom={true}
+        zoomControl={false}
         className="h-full w-full"
         style={{ height: "100%", width: "100%" }}
       >
+        <ZoomControl position="bottomright" />
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution="© OpenStreetMap contributors"

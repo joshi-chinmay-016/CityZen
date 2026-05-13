@@ -290,16 +290,29 @@ const routeStressService = {
         throw new Error('Invalid route endpoints. Expected { lat, lng } or [lat, lng].');
       }
 
-      // 1) Get route geometry from OSRM in [lat, lng] format.
-      //    Request alternate routes so each path can be scored separately.
-      const routeCandidates = await osrmService.getRouteAlternatives(source, destination, 3);
-
-      // 2) Pull normalized hazard reports from Firestore intelligence layer.
-      const reports = await firestoreService.getAllReports();
-
-      // 3) Pull crowd journey reports for crowd intelligence analysis.
-      const journeySnapshot = await db.collection('journeyReports').get();
-      const journeyReports = journeySnapshot.docs.map((doc) => doc.data());
+      // 1-3) Fetch all data sources in parallel to minimize total latency and prevent timeouts.
+      const [routeCandidates, reports, journeyReports] = await Promise.all([
+        // OSRM route geometry
+        osrmService.getRouteAlternatives(source, destination, 3),
+        
+        // Hazard reports (already has integrated timeout/fallback in firestoreService)
+        firestoreService.getAllReports(),
+        
+        // Journey reports (direct fetch with integrated timeout)
+        (async () => {
+          try {
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Journey reports fetch timed out')), 3000)
+            );
+            const queryPromise = db.collection('journeyReports').get();
+            const snapshot = await Promise.race([queryPromise, timeoutPromise]);
+            return snapshot.docs.map((doc) => doc.data());
+          } catch (e) {
+            console.warn('[Route Stress] Failed to fetch journey reports (Quota or Timeout). Using empty fallback.');
+            return [];
+          }
+        })()
+      ]);
 
       // 4) Score every alternate route independently integrating both AI hazards
       //    and crowd intelligence, then sort by stress.

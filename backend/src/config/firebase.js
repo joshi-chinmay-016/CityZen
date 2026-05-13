@@ -70,6 +70,6 @@ const db = admin.firestore();
 // Optional setting (safe)
 db.settings({ ignoreUndefinedProperties: true });
 
-console.log("Firebase connected successfully");
+console.log(`Firebase connected successfully to project: ${serviceAccount.project_id}`);
 
 module.exports = db;

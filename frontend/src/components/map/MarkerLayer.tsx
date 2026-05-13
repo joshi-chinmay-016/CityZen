@@ -30,16 +30,16 @@ export default function MarkerLayer() {
   // Filter out any malformed reports without valid numeric coordinates
   const validReports = reports.filter(r => {
     if (!r) return false;
-    const lat = Number((r as any).latitude);
-    const lng = Number((r as any).longitude);
+    const lat = Number((r as any).latitude || (r as any).lat);
+    const lng = Number((r as any).longitude || (r as any).lng);
     return Number.isFinite(lat) && Number.isFinite(lng);
   });
 
   return (
     <>
       {validReports.map((report) => {
-        const lat = Number((report as any).latitude);
-        const lng = Number((report as any).longitude);
+        const lat = Number((report as any).latitude || (report as any).lat);
+        const lng = Number((report as any).longitude || (report as any).lng);
         const hazardType = (report as any).hazard as string | undefined;
         const icon = getHazardIcon(hazardType);
 

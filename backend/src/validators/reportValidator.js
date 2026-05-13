@@ -6,17 +6,22 @@ MODULE: Report Payload Validators
 const { REPORT_TYPES } = require("../constants");
 
 function validateReportPayload(payload = {}) {
-  const { lat, lng, type } = payload;
+  const latitude = payload.latitude ?? payload.lat;
+  const longitude = payload.longitude ?? payload.lng;
+  const type = payload.type ?? payload.hazard;
 
-  if (lat === undefined || lng === undefined || type === undefined) {
-    return "Missing required fields: lat, lng, type";
+  if (latitude === undefined || longitude === undefined || type === undefined) {
+    return "Missing required fields: coordinates (lat/lng or latitude/longitude) and hazard type";
   }
 
-  if (typeof lat !== "number" || typeof lng !== "number") {
-    return "lat and lng must be numbers";
+  if (typeof Number(latitude) !== "number" || typeof Number(longitude) !== "number") {
+    return "Coordinates must be valid numbers";
   }
 
-  if (!REPORT_TYPES.includes(type)) {
+  const normalizedType = String(type).toLowerCase();
+  const allowed = REPORT_TYPES.map(t => t.toLowerCase());
+  
+  if (!allowed.includes(normalizedType)) {
     return `type must be one of: ${REPORT_TYPES.join(", ")}`;
   }
 

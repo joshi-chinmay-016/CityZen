@@ -23,6 +23,6 @@ const { getHeatmap } = require('../controllers/heatmapController');
  * Returns danger zone intensity data for frontend map visualization.
  * Response format: [[latitude, longitude, intensity], ...]
  */
-router.get('/heatmap', getHeatmap);
+router.get('/', getHeatmap);
 
 module.exports = router;

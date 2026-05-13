@@ -18,6 +18,9 @@ type RootLayoutProps = {
   children: ReactNode;
 };
 
+import { AuthProvider } from '../contexts/AuthContext';
+import { AuthWidget, AuthModal } from '../components/auth/AuthWidget';
+
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en">
@@ -27,9 +30,13 @@ export default function RootLayout({ children }: RootLayoutProps) {
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
       </head>
       <body className="bg-[#050505] text-white">
-        <ToasterProvider />
-        <Navbar />
-        <main>{children}</main>
+        <AuthProvider>
+          <ToasterProvider />
+          <Navbar />
+          <AuthWidget />
+          <AuthModal />
+          <main>{children}</main>
+        </AuthProvider>
       </body>
     </html>
   );
