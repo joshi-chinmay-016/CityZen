@@ -178,4 +178,88 @@ router.post("/route-stress", async (req, res) => {
   }
 });
 
+// Analyze crowd intelligence analytics for city-wide complaint patterns.
+// Provides hotspot intelligence and dashboard statistics.
+router.get("/journey-analytics", async (req, res) => {
+  try {
+    // Fetch all crowd journey reports for analytics aggregation.
+    const journeySnapshot = await db.collection("journeyReports").get();
+    const journeyReports = journeySnapshot.docs.map((doc) => doc.data());
+
+    if (journeyReports.length === 0) {
+      return res.status(200).json({
+        totalJourneyReports: 0,
+        lowRatings: 0,
+        unsafeRoadComplaints: 0,
+        mostCommonIssue: null,
+        averageRating: 0,
+        highRiskZones: [],
+      });
+    }
+
+    // Count total journey reports.
+    const totalJourneyReports = journeyReports.length;
+
+    // Count low ratings (user experience < 2).
+    const lowRatings = journeyReports.filter(
+      (r) => r.rating !== undefined && r.rating <= 2
+    ).length;
+
+    // Count unsafe road complaints from crowd intelligence.
+    const unsafeRoadComplaints = journeyReports.filter(
+      (r) => r.issueType && r.issueType.toLowerCase() === "unsafe road"
+    ).length;
+
+    // Calculate average user rating across all journey reports.
+    const validRatings = journeyReports.filter(
+      (r) => r.rating !== undefined && typeof r.rating === "number"
+    );
+    const averageRating =
+      validRatings.length > 0
+        ? (validRatings.reduce((sum, r) => sum + r.rating, 0) /
+            validRatings.length).toFixed(2)
+        : 0;
+
+    // Determine most common issue type from crowd complaints.
+    const issueTypeCounts = {};
+    journeyReports.forEach((r) => {
+      if (r.issueType) {
+        const normalizedType = r.issueType.toLowerCase();
+        issueTypeCounts[normalizedType] =
+          (issueTypeCounts[normalizedType] || 0) + 1;
+      }
+    });
+
+    const mostCommonIssue =
+      Object.keys(issueTypeCounts).length > 0
+        ? Object.entries(issueTypeCounts).sort(
+            ([, countA], [, countB]) => countB - countA
+          )[0][0]
+        : null;
+
+    // Generate hotspot intelligence: top complaint categories ranked by frequency.
+    const highRiskZones = Object.entries(issueTypeCounts)
+      .map(([issueType, count]) => ({
+        issueType,
+        count,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    return res.status(200).json({
+      totalJourneyReports,
+      lowRatings,
+      unsafeRoadComplaints,
+      mostCommonIssue,
+      averageRating: Number(averageRating),
+      highRiskZones,
+    });
+  } catch (error) {
+    console.error("Error fetching journey analytics:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  }
+});
+
 module.exports = router;
