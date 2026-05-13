@@ -10,6 +10,7 @@ const reportRoutes = require("./routes/reportRoutes");
 const intelligenceRoutes = require("./routes/intelligenceRoutes");
 const heatmapRoutes = require("./routes/heatmapRoutes");
 const routeRoutes = require("./routes/routeRoutes");
+const journeyRoutes = require("./routes/journeyRoutes");
 const { notFoundHandler, errorHandler } = require("./middleware/errorHandler");
 
 const app = express();
@@ -26,6 +27,7 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/intelligence", intelligenceRoutes);
 app.use("/api/heatmap", heatmapRoutes);
 app.use("/api/routes", routeRoutes);
+app.use("/api", journeyRoutes);
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok", service: "CityZen Unified Backend" });
