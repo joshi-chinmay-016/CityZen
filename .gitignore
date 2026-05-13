@@ -83,8 +83,13 @@ ml-service/models/*.h5
 ml-service/models/*.pkl
 ml-service/models/*.joblib
 ml-service/models/*.onnx
+ml-service/models/*.pt
+ml-service/models/*.pth
 ml-service/logs/
 ml-service/checkpoints/
+ml-service/runs/
 **/__pycache__/
 **/*.pyc
-
+.venv
+venv/
+runs/
