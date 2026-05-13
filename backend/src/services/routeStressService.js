@@ -15,6 +15,7 @@ RESPONSIBILITIES:
 const osrmService = require('./osrmService');
 const firestoreService = require('./firestoreService');
 const { calculateDistance, isWithinRadius } = require('../utils/distanceCalculator');
+const db = require('../config/firebase');
 
 const HAZARD_SEARCH_RADIUS_METERS = 300;
 const SAFE_THRESHOLD = 30;
@@ -23,6 +24,14 @@ const SEVERITY_WEIGHTS = {
   low: 1,
   medium: 3,
   high: 5
+};
+
+// Crowd intelligence weights for journey complaints.
+const JOURNEY_COMPLAINT_WEIGHTS = {
+  unsafe_road: 4,
+  low_rating: 2,
+  pothole: 2,
+  traffic: 3
 };
 
 const classifyRouteType = (stressScore) => {
@@ -35,6 +44,92 @@ const classifyRouteType = (stressScore) => {
   }
 
   return 'risky';
+};
+
+/**
+ * Finds journey complaints relevant to the route between start and destination.
+ * Analyzes crowd-sourced feedback including unsafe roads and low ratings.
+ */
+const findNearbyJourneyComplaints = (start, destination, journeyReports) => {
+  if (!Array.isArray(journeyReports) || journeyReports.length === 0) {
+    return [];
+  }
+
+  const complaints = [];
+  const normalizedStart = String(start || '').toLowerCase().trim();
+  const normalizedDest = String(destination || '').toLowerCase().trim();
+
+  for (const report of journeyReports) {
+    const reportStart = String(report.start || '').toLowerCase().trim();
+    const reportDest = String(report.destination || '').toLowerCase().trim();
+
+    // Match journey reports that are on or near the same route (bidirectional).
+    const isRelevantRoute =
+      (reportStart === normalizedStart && reportDest === normalizedDest) ||
+      (reportStart === normalizedDest && reportDest === normalizedStart);
+
+    if (!isRelevantRoute) {
+      continue;
+    }
+
+    // Unsafe road complaints directly increase stress.
+    if (report.issueType && report.issueType.toLowerCase() === 'unsafe road') {
+      complaints.push({
+        type: 'unsafe_road',
+        weight: JOURNEY_COMPLAINT_WEIGHTS.unsafe_road,
+        rating: report.rating,
+        timestamp: report.timestamp
+      });
+    }
+
+    // Low user ratings (<=2) indicate poor journey experience.
+    if (report.rating !== undefined && report.rating <= 2) {
+      complaints.push({
+        type: 'low_rating',
+        weight: JOURNEY_COMPLAINT_WEIGHTS.low_rating,
+        rating: report.rating,
+        timestamp: report.timestamp
+      });
+    }
+
+    // Pothole complaints from crowd.
+    if (report.issueType && report.issueType.toLowerCase() === 'pothole') {
+      complaints.push({
+        type: 'pothole',
+        weight: JOURNEY_COMPLAINT_WEIGHTS.pothole,
+        rating: report.rating,
+        timestamp: report.timestamp
+      });
+    }
+
+    // Traffic complaints from crowd.
+    if (report.issueType && report.issueType.toLowerCase() === 'traffic') {
+      complaints.push({
+        type: 'traffic',
+        weight: JOURNEY_COMPLAINT_WEIGHTS.traffic,
+        rating: report.rating,
+        timestamp: report.timestamp
+      });
+    }
+  }
+
+  return complaints;
+};
+
+/**
+ * Calculates crowd intelligence weight based on complaint frequency and severity.
+ * Multiple similar complaints from different users increase the weight.
+ */
+const calculateJourneyComplaintStress = (complaints) => {
+  if (!Array.isArray(complaints) || complaints.length === 0) {
+    return 0;
+  }
+
+  // Sum weights directly; repeated complaints naturally increase total stress.
+  const totalWeight = complaints.reduce((sum, complaint) => sum + complaint.weight, 0);
+
+  // Cap journey complaint stress contribution to prevent dominating AI hazards.
+  return Math.min(totalWeight, 40);
 };
 
 /**
@@ -129,22 +224,29 @@ const findNearbyHazards = (routeCoordinates, reports, radius) => {
 /**
  * Converts nearby hazards into a deterministic 0-100 stress score.
  * The score increases with both hazard count and severity.
+ * Now includes crowd intelligence: journey complaints and low ratings.
  */
-const calculateStressScore = (hazards) => {
-  if (!Array.isArray(hazards) || hazards.length === 0) {
-    return 0;
+const calculateStressScore = (hazards, journeyComplaints = []) => {
+  let totalStress = 0;
+
+  // AI hazard stress component.
+  if (Array.isArray(hazards) && hazards.length > 0) {
+    const hazardWeight = hazards.reduce((sum, hazard) => {
+      const weight = SEVERITY_WEIGHTS[String(hazard.severity || '').toLowerCase()] || 1;
+      return sum + weight;
+    }, 0);
+    totalStress += Math.round((hazardWeight / 30) * 100);
   }
 
-  const totalWeight = hazards.reduce((sum, hazard) => {
-    const weight = SEVERITY_WEIGHTS[String(hazard.severity || '').toLowerCase()] || 1;
-    return sum + weight;
-  }, 0);
+  // Crowd intelligence stress component from journey complaints.
+  const journeyStress = calculateJourneyComplaintStress(journeyComplaints);
+  totalStress += journeyStress;
 
-  const normalizedScore = Math.round((totalWeight / 30) * 100);
-  return Math.max(0, Math.min(100, normalizedScore));
+  // Normalize combined score to 0-100 range.
+  return Math.max(0, Math.min(100, totalStress));
 };
 
-const analyzeRouteCandidate = (routeData, reports) => {
+const analyzeRouteCandidate = (routeData, reports, start, destination, journeyReports = []) => {
   const routeCoordinates = Array.isArray(routeData?.coordinates) ? routeData.coordinates : [];
 
   // Analyze each alternate route independently so the frontend can compare
@@ -154,7 +256,12 @@ const analyzeRouteCandidate = (routeData, reports) => {
     reports,
     HAZARD_SEARCH_RADIUS_METERS
   );
-  const stressScore = calculateStressScore(nearbyHazards);
+
+  // Find crowd intelligence: journey complaints on this route.
+  const journeyComplaints = findNearbyJourneyComplaints(start, destination, journeyReports);
+
+  // Calculate combined stress score integrating both AI hazards and crowd intelligence.
+  const stressScore = calculateStressScore(nearbyHazards, journeyComplaints);
   const type = classifyRouteType(stressScore);
 
   return {
@@ -189,17 +296,15 @@ const routeStressService = {
 
       // 2) Pull normalized hazard reports from Firestore intelligence layer.
       const reports = await firestoreService.getAllReports();
-      // ======================================================
-      // DEBUG LOGGING (TEMPORARILY COMMENTED)
-      // Used during Firestore normalization + route matching tests.
-      // Can be re-enabled for backend debugging if needed.
-      // ======================================================
 
-      // console.log("REPORTS:", reports);
+      // 3) Pull crowd journey reports for crowd intelligence analysis.
+      const journeySnapshot = await db.collection('journeyReports').get();
+      const journeyReports = journeySnapshot.docs.map((doc) => doc.data());
 
-      // 3) Score every alternate route independently, then sort by stress.
+      // 4) Score every alternate route independently integrating both AI hazards
+      //    and crowd intelligence, then sort by stress.
       const routes = (Array.isArray(routeCandidates) ? routeCandidates : [])
-        .map((route) => analyzeRouteCandidate(route, reports))
+        .map((route) => analyzeRouteCandidate(route, reports, start, end, journeyReports))
         .sort((left, right) => left.stress_score - right.stress_score);
 
       const bestRoute = routes[0] || {
@@ -212,7 +317,7 @@ const routeStressService = {
         nearby_hazards: []
       };
 
-      // 4) Return a multi-route response while preserving legacy best-route fields.
+      // 5) Return a multi-route response while preserving legacy best-route fields.
       return {
         routes,
         stress_score: bestRoute.stress_score,
