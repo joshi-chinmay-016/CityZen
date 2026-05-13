@@ -18,7 +18,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { geocodingService } from '@/services/geocodingService';
-import { reportService, HazardReport } from '@/services/reportService';
+import { reportService } from '@/services/reportService';
 import { toast } from 'react-hot-toast';
 
 /*

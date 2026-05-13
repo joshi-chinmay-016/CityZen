@@ -45,10 +45,8 @@ import MapSidebar from "./MapSidebar";
 export default function LeafletMap() {
   const {
   routeResult,
-  fetchSafeRoute,
   sourceCoords,
-  destinationCoords
-  ,
+  destinationCoords,
   selectingField,
   setSelectingField,
   setSourceCoords,
@@ -99,10 +97,7 @@ export default function LeafletMap() {
         )}
 
         {/* Safe Route Layer */}
-       <RouteLayer
-        route={routeResult?.route ?? []}
-        safe={routeResult?.safe ?? true}
-        />
+        <RouteLayer />
         {/* Map click handler: listens for clicks when user is selecting source/dest */}
         <MapClickHandler />
       </MapContainer>
