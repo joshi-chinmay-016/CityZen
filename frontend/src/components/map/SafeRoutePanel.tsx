@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   MapPin, 
@@ -32,17 +32,56 @@ export default function SafeRoutePanel() {
     destinationCoords,
     setSourceCoords,
     setDestinationCoords
+    ,
+    selectingField,
+    setSelectingField
   } = useSafeRoute();
 
   const [sourceSuggestions, setSourceSuggestions] = useState<GeocodingResult[]>([]);
   const [destSuggestions, setDestSuggestions] = useState<GeocodingResult[]>([]);
+  const sourceDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const destDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const [isLoadingGeocoding, setIsLoadingGeocoding] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
   // Auto-detect location on mount
+  // NOTE: do not auto-detect on mount anymore. User must choose current or select on map.
+
+  // When coords change (including via map selection), reverse-geocode to update the display text
   useEffect(() => {
-    handleUseCurrentLocation();
+    const applyReverse = async () => {
+      if (sourceCoords) {
+        try {
+          const addr = await geocodingService.reverseGeocode(sourceCoords[0], sourceCoords[1]);
+          setSourceText(addr);
+        } catch (err) {
+          setSourceText(`${sourceCoords[0].toFixed(4)}, ${sourceCoords[1].toFixed(4)}`);
+        }
+      }
+    };
+    applyReverse();
+  }, [sourceCoords]);
+
+  useEffect(() => {
+    const applyReverse = async () => {
+      if (destinationCoords) {
+        try {
+          const addr = await geocodingService.reverseGeocode(destinationCoords[0], destinationCoords[1]);
+          setDestText(addr);
+        } catch (err) {
+          setDestText(`${destinationCoords[0].toFixed(4)}, ${destinationCoords[1].toFixed(4)}`);
+        }
+      }
+    };
+    applyReverse();
+  }, [destinationCoords]);
+
+  useEffect(() => {
+    return () => {
+      if (sourceDebounceRef.current) clearTimeout(sourceDebounceRef.current);
+      if (destDebounceRef.current) clearTimeout(destDebounceRef.current);
+    };
   }, []);
 
   const handleUseCurrentLocation = useCallback(() => {
@@ -74,19 +113,26 @@ export default function SafeRoutePanel() {
   }, [setSourceCoords]);
 
   const searchLocations = async (query: string, type: 'source' | 'dest') => {
+    const debounceRef = type === 'source' ? sourceDebounceRef : destDebounceRef;
+    const setSuggestions = type === 'source' ? setSourceSuggestions : setDestSuggestions;
+
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
     if (query.length < 3) {
-      if (type === 'source') setSourceSuggestions([]);
-      else setDestSuggestions([]);
+      setSuggestions([]);
       return;
     }
 
-    try {
-      const results = await geocodingService.geocodeLocation(query);
-      if (type === 'source') setSourceSuggestions(results);
-      else setDestSuggestions(results);
-    } catch (err) {
-      console.error(err);
-    }
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const results = await geocodingService.geocodeLocation(query);
+        setSuggestions(results);
+      } catch (err) {
+        console.error(err);
+      }
+    }, 350);
   };
 
   const handleSelectLocation = (result: GeocodingResult, type: 'source' | 'dest') => {
@@ -169,14 +215,27 @@ export default function SafeRoutePanel() {
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                 <MapPin className="w-3 h-3 text-emerald-400" /> Start Location
               </label>
-              <button 
-                type="button"
-                onClick={handleUseCurrentLocation}
-                className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors"
-              >
-                {isLoadingGeocoding ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Locate className="w-2.5 h-2.5" />}
-                Current
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  type="button"
+                  onClick={handleUseCurrentLocation}
+                  className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors"
+                >
+                  {isLoadingGeocoding ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Locate className="w-2.5 h-2.5" />}
+                  Current
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectingField('source');
+                    setLocalError(null);
+                  }}
+                  className={`text-[10px] text-slate-300/90 hover:text-white flex items-center gap-1 transition-colors px-2 py-1 rounded-lg border border-slate-700/40 ${selectingField === 'source' ? 'bg-slate-800/40' : ''}`}
+                >
+                  Select on map
+                </button>
+              </div>
             </div>
             <div className="relative">
               <input
@@ -199,7 +258,7 @@ export default function SafeRoutePanel() {
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="absolute left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-[1100] max-h-60 overflow-y-auto overflow-x-hidden"
+                  className="relative left-0 right-0 mt-2 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-[1100] max-h-60 overflow-y-auto overflow-x-hidden"
                 >
                   {sourceSuggestions.map((res, i) => (
                     <button
@@ -222,6 +281,18 @@ export default function SafeRoutePanel() {
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                 <MapPin className="w-3 h-3 text-rose-400" /> Destination
               </label>
+              <div className="ml-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectingField('dest');
+                    setLocalError(null);
+                  }}
+                  className={`text-[10px] text-slate-300/90 hover:text-white flex items-center gap-1 transition-colors px-2 py-1 rounded-lg border border-slate-700/40 ${selectingField === 'dest' ? 'bg-slate-800/40' : ''}`}
+                >
+                  Select on map
+                </button>
+              </div>
             </div>
             <div className="relative">
               <input
@@ -244,7 +315,7 @@ export default function SafeRoutePanel() {
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="absolute left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-[1100] max-h-60 overflow-y-auto overflow-x-hidden"
+                  className="relative left-0 right-0 mt-2 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-[1100] max-h-60 overflow-y-auto overflow-x-hidden"
                 >
                   {destSuggestions.map((res, i) => (
                     <button

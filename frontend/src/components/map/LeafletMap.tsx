@@ -14,6 +14,9 @@ import MarkerLayer from "./MarkerLayer";
 import RouteLayer from "./RouteLayer";
 import { useSafeRoute } from "@/hooks/useSafeRoute";
 import L from 'leaflet';
+import { useEffect } from 'react';
+import { useMapEvents } from 'react-leaflet';
+import { geocodingService } from '@/services/geocodingService';
 
 // Custom icons
 const sourceIcon = new L.Icon({
@@ -45,6 +48,11 @@ export default function LeafletMap() {
   fetchSafeRoute,
   sourceCoords,
   destinationCoords
+  ,
+  selectingField,
+  setSelectingField,
+  setSourceCoords,
+  setDestinationCoords
 } = useSafeRoute();
 
   console.log("LeafletMap routeData", routeResult);
@@ -95,8 +103,45 @@ export default function LeafletMap() {
         route={routeResult?.route ?? []}
         safe={routeResult?.safe ?? true}
         />
+        {/* Map click handler: listens for clicks when user is selecting source/dest */}
+        <MapClickHandler />
       </MapContainer>
       <SeverityLegend />
     </div>
   );
+}
+
+function MapClickHandler() {
+  const {
+    selectingField,
+    setSelectingField,
+    setSourceCoords,
+    setDestinationCoords
+  } = useSafeRoute();
+
+  useMapEvents({
+    click: async (e) => {
+      if (!selectingField || selectingField === 'none') return;
+
+      const { lat, lng } = e.latlng;
+
+      if (selectingField === 'source') {
+        setSourceCoords([lat, lng]);
+      } else if (selectingField === 'dest') {
+        setDestinationCoords([lat, lng]);
+      }
+
+      // attempt a reverse geocode in background (UI component will pick up coords)
+      try {
+        await geocodingService.reverseGeocode(lat, lng);
+      } catch (err) {
+        // ignore - SafeRoutePanel will fallback to lat/lng display
+      }
+
+      // turn off selecting mode
+      setSelectingField('none');
+    }
+  });
+
+  return null;
 }

@@ -26,15 +26,27 @@ export default function MarkerLayer() {
     return null;
   }
 
+  // Filter out any malformed reports without valid numeric coordinates
+  const validReports = reports.filter(r => {
+    if (!r) return false;
+    const lat = Number((r as any).latitude);
+    const lng = Number((r as any).longitude);
+    return Number.isFinite(lat) && Number.isFinite(lng);
+  });
+
   return (
     <>
-      {reports.map((report) => (
-        <Marker key={report.id} position={[report.latitude, report.longitude]}>
-          <Popup>
-            <HazardPopup report={report} />
-          </Popup>
-        </Marker>
-      ))}
+      {validReports.map((report) => {
+        const lat = Number((report as any).latitude);
+        const lng = Number((report as any).longitude);
+        return (
+          <Marker key={report.id} position={[lat, lng]}>
+            <Popup>
+              <HazardPopup report={report} />
+            </Popup>
+          </Marker>
+        );
+      })}
     </>
   );
 }

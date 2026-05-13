@@ -11,6 +11,8 @@ interface RouteContextType {
   destinationCoords: [number, number] | null;
   setSourceCoords: (coords: [number, number] | null) => void;
   setDestinationCoords: (coords: [number, number] | null) => void;
+  selectingField: 'none' | 'source' | 'dest';
+  setSelectingField: (f: 'none' | 'source' | 'dest') => void;
   fetchSafeRoute: (params: RouteRequest) => Promise<void>;
   resetRoute: () => void;
 }
@@ -23,6 +25,7 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [sourceCoords, setSourceCoords] = useState<[number, number] | null>(null);
   const [destinationCoords, setDestinationCoords] = useState<[number, number] | null>(null);
+  const [selectingField, setSelectingField] = useState<'none' | 'source' | 'dest'>('none');
 
   const fetchSafeRoute = useCallback(async (params: RouteRequest) => {
     setIsLoading(true);
@@ -59,6 +62,8 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       destinationCoords, 
       setSourceCoords, 
       setDestinationCoords, 
+      selectingField,
+      setSelectingField,
       fetchSafeRoute, 
       resetRoute 
     }}>
