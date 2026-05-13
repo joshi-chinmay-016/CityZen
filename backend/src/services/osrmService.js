@@ -36,10 +36,11 @@ const TIMEOUT_MS = 5000;
  * @param {number[]} source - Starting point [latitude, longitude]
  * @param {number[]} destination - Ending point [latitude, longitude]
  * 
- * @returns {Promise<Object>} Route object containing:
- *   - distance: Route distance in meters
- *   - duration: Estimated travel time in seconds
- *   - coordinates: Array of [lat, lng] points along the route
+ * @returns {Promise<Object>} Route response containing:
+ *   - routes: Array of analyzed route candidates from OSRM
+ *   - distance: Legacy best-route distance in meters
+ *   - duration: Legacy best-route duration in seconds
+ *   - coordinates: Legacy best-route geometry as [lat, lng]
  * 
  * @throws {Error} If API request fails or response is invalid
  * 
@@ -47,7 +48,7 @@ const TIMEOUT_MS = 5000;
  * const route = await getRouteCoordinates([40.7128, -74.0060], [40.7580, -73.9855]);
  * // Returns: { distance: 6500, duration: 420, coordinates: [[40.7128, -74.0060], ...] }
  */
-async function getRouteCoordinates(source, destination) {
+async function getRouteAlternatives(source, destination, maxAlternatives = 3) {
   try {
     // Validate input format
     if (
@@ -91,10 +92,11 @@ async function getRouteCoordinates(source, destination) {
     // Format: /route/v1/{profile}/{coordinates}?options
     // profile: driving
     // coordinates: lng,lat;lng,lat (note: OSRM uses lng,lat order)
+    // alternatives=true: request OSRM alternate routes for comparison
     // overview=full: get full route geometry
     // geometries=geojson: return geometry in GeoJSON format (array of [lng, lat])
     // OSRM expects coordinates in lng,lat order. Convert here explicitly.
-    const url = `${OSRM_BASE_URL}/route/v1/driving/${sourceLng},${sourceLat};${destLng},${destLat}?overview=full&geometries=geojson`;
+    const url = `${OSRM_BASE_URL}/route/v1/driving/${sourceLng},${sourceLat};${destLng},${destLat}?alternatives=true&overview=full&geometries=geojson&steps=false`;
 
     // Fetch route from OSRM API
     const response = await axios.get(url, { timeout: TIMEOUT_MS });
@@ -106,29 +108,21 @@ async function getRouteCoordinates(source, destination) {
       );
     }
 
-    // Extract the first route (most direct)
-    const route = response.data.routes[0];
-    if (!route) {
+    // Extract up to `maxAlternatives` routes and parse them into a simple
+    // structure used by the route stress engine. Convert OSRM's [lng,lat]
+    // geometry to internal [lat,lng].
+    const routes = Array.isArray(response.data.routes) ? response.data.routes.slice(0, maxAlternatives) : [];
+    if (!routes.length) {
       throw new Error('No route found between source and destination.');
     }
 
-    // Parse route data
-    const distance = route.distance; // meters
-    const duration = route.duration; // seconds
-
-    // Convert OSRM geometry from [lng, lat] to [lat, lng]
-    // OSRM returns geometry as GeoJSON format: [[lng, lat], [lng, lat], ...]
-    const coordinates = route.geometry.coordinates.map(([lng, lat]) => [
-      lat,
-      lng
-    ]);
-
-    // Return parsed route data
-    return {
-      distance,
-      duration,
-      coordinates
-    };
+    return routes.map((route) => ({
+      distance: route.distance,
+      duration: route.duration,
+      coordinates: Array.isArray(route?.geometry?.coordinates)
+        ? route.geometry.coordinates.map(([lng, lat]) => [lat, lng])
+        : []
+    }));
   } catch (error) {
     // Log error for debugging
     console.error('OSRM Service Error:', error.message);
@@ -155,11 +149,18 @@ async function getRoute(start, end) {
 
   const source = toLatLng(start);
   const destination = toLatLng(end);
-  return getRouteCoordinates(source, destination);
+  const routes = await getRouteAlternatives(source, destination, 1);
+  return routes[0];
+}
+
+async function getRouteCoordinates(source, destination) {
+  const routes = await getRouteAlternatives(source, destination, 1);
+  return routes[0];
 }
 
 // Export service methods
 const osrmService = {
+  getRouteAlternatives,
   getRouteCoordinates,
   getRoute
 };

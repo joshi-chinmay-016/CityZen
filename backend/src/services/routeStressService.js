@@ -25,6 +25,18 @@ const SEVERITY_WEIGHTS = {
   high: 5
 };
 
+const classifyRouteType = (stressScore) => {
+  if (stressScore <= 25) {
+    return 'safe';
+  }
+
+  if (stressScore <= 60) {
+    return 'moderate';
+  }
+
+  return 'risky';
+};
+
 /**
  * Converts supported location input into [lat, lng] format.
  * Supports both { lat, lng } and [lat, lng] for compatibility.
@@ -132,6 +144,30 @@ const calculateStressScore = (hazards) => {
   return Math.max(0, Math.min(100, normalizedScore));
 };
 
+const analyzeRouteCandidate = (routeData, reports) => {
+  const routeCoordinates = Array.isArray(routeData?.coordinates) ? routeData.coordinates : [];
+
+  // Analyze each alternate route independently so the frontend can compare
+  // safer, balanced, and riskier options from the same origin/destination pair.
+  const nearbyHazards = findNearbyHazards(
+    routeCoordinates,
+    reports,
+    HAZARD_SEARCH_RADIUS_METERS
+  );
+  const stressScore = calculateStressScore(nearbyHazards);
+  const type = classifyRouteType(stressScore);
+
+  return {
+    type,
+    stress_score: stressScore,
+    safe: type === 'safe',
+    distance: routeData?.distance ?? 0,
+    duration: routeData?.duration ?? 0,
+    route: routeCoordinates,
+    nearby_hazards: nearbyHazards
+  };
+};
+
 const routeStressService = {
   calculateRouteStress: async (start, end) => {
     try {
@@ -148,8 +184,8 @@ const routeStressService = {
       }
 
       // 1) Get route geometry from OSRM in [lat, lng] format.
-      const routeData = await osrmService.getRouteCoordinates(source, destination);
-      const routeCoordinates = Array.isArray(routeData.coordinates) ? routeData.coordinates : [];
+      //    Request alternate routes so each path can be scored separately.
+      const routeCandidates = await osrmService.getRouteAlternatives(source, destination, 3);
 
       // 2) Pull normalized hazard reports from Firestore intelligence layer.
       const reports = await firestoreService.getAllReports();
@@ -161,15 +197,27 @@ const routeStressService = {
 
       // console.log("REPORTS:", reports);
 
-      // 3) Find hazards within 100m of the route and score risk.
-      const nearbyHazards = findNearbyHazards(routeCoordinates, reports, HAZARD_SEARCH_RADIUS_METERS);
-      const stressScore = calculateStressScore(nearbyHazards);
+      // 3) Score every alternate route independently, then sort by stress.
+      const routes = (Array.isArray(routeCandidates) ? routeCandidates : [])
+        .map((route) => analyzeRouteCandidate(route, reports))
+        .sort((left, right) => left.stress_score - right.stress_score);
 
-      // 4) Route safety classification for frontend contract.
+      const bestRoute = routes[0] || {
+        type: 'safe',
+        stress_score: 0,
+        safe: true,
+        distance: 0,
+        duration: 0,
+        route: [],
+        nearby_hazards: []
+      };
+
+      // 4) Return a multi-route response while preserving legacy best-route fields.
       return {
-        stress_score: stressScore,
-        safe: stressScore < SAFE_THRESHOLD,
-        route: routeCoordinates
+        routes,
+        stress_score: bestRoute.stress_score,
+        safe: bestRoute.safe,
+        route: bestRoute.route
       };
     } catch (error) {
       console.error('Error calculating route stress:', error.message);
