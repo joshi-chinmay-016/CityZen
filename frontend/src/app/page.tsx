@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { 
@@ -26,68 +26,125 @@ SECTION 1 — HERO
 - CTA buttons: Find Safe Route, View Live Map
 */
 
+const FadeIn = ({ children, delay = 0, duration = 1000 }: { children: React.ReactNode, delay?: number, duration?: number }) => {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setVisible(true), delay);
+    return () => clearTimeout(timer);
+  }, [delay]);
+
+  return (
+    <div
+      className="transition-opacity"
+      style={{ opacity: visible ? 1 : 0, transitionDuration: `${duration}ms` }}
+    >
+      {children}
+    </div>
+  );
+};
+
+const AnimatedHeading = ({ text }: { text: string }) => {
+  const [started, setStarted] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setStarted(true), 200);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const lines = text.split('\n');
+  const charDelay = 30;
+  const transitionDuration = 500;
+  
+  let cumulativeLength = 0;
+
+  return (
+    <div style={{ letterSpacing: '-0.04em' }} className="text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-normal mb-4 text-white">
+      {lines.map((line, lineIndex) => {
+        const lineElements = (
+          <div key={lineIndex}>
+            {line.split('').map((char, charIndex) => {
+              const delay = started ? (cumulativeLength + charIndex) * charDelay : 0;
+              const displayChar = char === ' ' ? '\u00A0' : char;
+              return (
+                <span
+                  key={charIndex}
+                  className="inline-block transition-all"
+                  style={{
+                    opacity: started ? 1 : 0,
+                    transform: started ? 'translateX(0)' : 'translateX(-18px)',
+                    transitionDuration: `${transitionDuration}ms`,
+                    transitionDelay: `${delay}ms`,
+                  }}
+                >
+                  {displayChar}
+                </span>
+              );
+            })}
+          </div>
+        );
+        cumulativeLength += line.length;
+        return lineElements;
+      })}
+    </div>
+  );
+};
+
 const HeroSection = () => {
   return (
-    <div className="relative pt-32 pb-20 px-6 overflow-hidden">
-      {/* Background Glows */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full -z-10 pointer-events-none">
-        <div className="absolute top-20 left-1/4 w-96 h-96 bg-emerald-500/10 blur-[120px] rounded-full" />
-        <div className="absolute bottom-20 right-1/4 w-96 h-96 bg-cyan-500/10 blur-[120px] rounded-full" />
+    <div className="relative min-h-screen flex flex-col justify-end px-6 md:px-12 lg:px-16 pb-12 lg:pb-16 overflow-hidden">
+      {/* Video Background */}
+      <div className="absolute inset-0 w-full h-full pointer-events-none">
+        <video
+          className="w-full h-full object-cover"
+          src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260403_050628_c4e32401-fab4-4a27-b7a8-6e9291cd5959.mp4"
+          autoPlay
+          loop
+          muted
+          playsInline
+        />
       </div>
 
-      <div className="max-w-7xl mx-auto text-center">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 mb-8"
-        >
-          <ShieldCheck size={18} />
-          <span className="text-sm font-medium tracking-wide uppercase">AI-Powered Road Safety</span>
-        </motion.div>
+      {/* Main Content Container */}
+      <div className="w-full lg:grid lg:grid-cols-2 lg:items-end relative z-10">
+        
+        {/* Left Column - Main content */}
+        <div>
+          <AnimatedHeading text={"Navigate roads\nstress-free"} />
 
-        <motion.h1
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
-          className="text-6xl md:text-8xl font-bold text-white mb-8 tracking-tight"
-        >
-          Navigate roads <br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">
-            stress-free
-          </span>
-        </motion.h1>
+          <FadeIn delay={800}>
+            <p className="text-base md:text-lg text-gray-300 mb-5 max-w-lg">
+              Harnessing advanced machine learning to detect potholes, manholes, and cracks in real-time. The safest route for you and your vehicle is just a click away.
+            </p>
+          </FadeIn>
 
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="max-w-2xl mx-auto text-slate-400 text-lg md:text-xl mb-12 leading-relaxed"
-        >
-          Harnessing advanced machine learning to detect potholes, manholes, and cracks in real-time. 
-          The safest route for you and your vehicle is just a click away.
-        </motion.p>
+          <FadeIn delay={1200}>
+            <div className="flex flex-wrap gap-4">
+              <Link 
+                href="/map" 
+                className="bg-white text-black px-8 py-3 rounded-lg font-medium hover:bg-gray-100 transition-colors"
+              >
+                Find Safe Route
+              </Link>
+              <Link 
+                href="/map" 
+                className="liquid-glass border border-white/20 text-white px-8 py-3 rounded-lg font-medium hover:bg-white hover:text-black transition-colors"
+              >
+                View Live Map
+              </Link>
+            </div>
+          </FadeIn>
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.3 }}
-          className="flex flex-col sm:flex-row items-center justify-center gap-4"
-        >
-          <Link 
-            href="/map" 
-            className="group px-8 py-4 rounded-xl bg-emerald-500 text-slate-950 font-bold text-lg hover:bg-emerald-400 transition-all flex items-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)]"
-          >
-            Find Safe Route
-            <Navigation size={20} className="group-hover:translate-x-1 transition-transform" />
-          </Link>
-          <Link 
-            href="/map" 
-            className="px-8 py-4 rounded-xl bg-slate-800/50 text-white font-semibold text-lg hover:bg-slate-800 transition-all border border-slate-700 backdrop-blur-md"
-          >
-            View Live Map
-          </Link>
-        </motion.div>
+        {/* Right Column - Tag */}
+        <div className="hidden lg:flex items-end justify-end">
+          <FadeIn delay={1400}>
+            <div className="liquid-glass border border-white/20 px-6 py-3 rounded-xl">
+              <span className="text-lg md:text-xl lg:text-2xl font-light text-white">
+                AI-Powered Road Safety
+              </span>
+            </div>
+          </FadeIn>
+        </div>
+
       </div>
     </div>
   );
