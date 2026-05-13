@@ -40,8 +40,6 @@ const destIcon = new L.Icon({
 const bangaloreCenter: [number, number] = [12.9716, 77.5946];
 
 
-import MapSidebar from "./MapSidebar";
-
 export default function LeafletMap() {
   const {
   routeResult,
@@ -62,7 +60,6 @@ export default function LeafletMap() {
       className="h-screen w-full relative"
       style={{ height: "100vh", width: "100vw" }}
     >
-      <MapSidebar />
       <MapContainer
         center={bangaloreCenter}
         zoom={13}
