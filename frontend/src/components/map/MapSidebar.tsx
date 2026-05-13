@@ -1,126 +1,135 @@
 "use client";
 
-import React, { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { Activity, AlertTriangle, ChevronLeft, Filter, Layers3 } from "lucide-react";
-
-const hazards = [
-  { id: "pothole", label: "Potholes", color: "bg-red-400", glow: "glow-red" },
-  { id: "manhole", label: "Manholes", color: "bg-amber-400", glow: "glow-amber" },
-  { id: "crack", label: "Cracks", color: "bg-sky-400", glow: "glow-blue" },
-];
-
-const feed = [
-  { title: "Pothole at MG Road", time: "2m ago", tone: "text-red-300" },
-  { title: "Manhole at Indiranagar", time: "15m ago", tone: "text-amber-300" },
-  { title: "Crack at Koramangala", time: "1h ago", tone: "text-sky-300" },
-];
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Filter, 
+  ChevronLeft, 
+  ChevronRight, 
+  AlertTriangle, 
+  Info,
+  Clock,
+  Layers,
+  Activity,
+  MapPin
+} from 'lucide-react';
 
 export default function MapSidebar() {
   const [isOpen, setIsOpen] = useState(true);
-  const [activeFilters, setActiveFilters] = useState<string[]>(["pothole", "manhole", "crack"]);
+  const [activeFilters, setActiveFilters] = useState<string[]>(['pothole', 'manhole', 'crack']);
 
   const toggleFilter = (type: string) => {
-    setActiveFilters((current) =>
-      current.includes(type) ? current.filter((item) => item !== type) : [...current, type]
+    setActiveFilters(prev => 
+      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
     );
   };
 
+  const recentHazards = [
+    { type: 'Pothole', severity: 4, location: 'MG Road', time: '2m ago' },
+    { type: 'Manhole', severity: 5, location: 'Indiranagar', time: '15m ago' },
+    { type: 'Crack', severity: 2, location: 'Koramangala', time: '1h ago' },
+  ];
+
   return (
-    <div className="pointer-events-auto fixed bottom-6 left-4 z-[1100] flex items-end gap-2 md:left-6 lg:bottom-6">
+    <div className="fixed left-6 top-24 z-[1000] flex items-start gap-2">
       <AnimatePresence>
-        {isOpen ? (
-          <motion.aside
-            initial={{ opacity: 0, x: -40 }}
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, x: -100 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -40 }}
-            className="glass-map w-[min(300px,calc(100vw-2rem))] rounded-[24px] p-5 shadow-[0_22px_60px_rgba(0,0,0,0.42)]"
+            exit={{ opacity: 0, x: -100 }}
+            className="w-72 p-6 rounded-2xl bg-slate-900/80 border border-slate-800 backdrop-blur-xl shadow-2xl overflow-hidden max-h-[calc(100vh-120px)] overflow-y-auto"
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="rounded-2xl border border-cyan-400/16 bg-cyan-500/10 p-2.5 text-cyan-300">
-                  <Layers3 className="h-4 w-4" />
-                </div>
-                <div>
-                  <div className="font-display text-2xl tracking-tight text-[#f0f4ff]">Map layers</div>
-                  <div className="text-xs text-[#f0f4ff]/38">Control what the city surface reveals.</div>
-                </div>
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-2 text-white font-bold">
+                <Layers className="text-emerald-400" size={20} />
+                Map Layers
               </div>
-              <button
-                type="button"
+              <button 
                 onClick={() => setIsOpen(false)}
-                className="rounded-xl border border-white/8 bg-white/[0.03] p-2 text-white/45 transition hover:text-white"
+                className="p-1 hover:bg-slate-800 rounded-lg text-slate-500 transition-colors"
               >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft size={20} />
               </button>
             </div>
 
-            <div className="mt-5 space-y-3">
-              {hazards.map((hazard) => {
-                const active = activeFilters.includes(hazard.id);
-                return (
+            {/* Hazard Filters */}
+            <div className="space-y-4 mb-8">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Active Hazards</label>
+              <div className="space-y-2">
+                {[
+                  { id: 'pothole', label: 'Potholes', color: 'bg-emerald-500' },
+                  { id: 'manhole', label: 'Open Manholes', color: 'bg-rose-500' },
+                  { id: 'crack', label: 'Road Cracks', color: 'bg-amber-500' },
+                ].map(hazard => (
                   <button
                     key={hazard.id}
-                    type="button"
                     onClick={() => toggleFilter(hazard.id)}
-                    className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left transition ${
-                      active
-                        ? "border-white/10 bg-white/[0.04] text-[#f0f4ff]"
-                        : "border-white/[0.04] bg-black/10 text-[#f0f4ff]/36"
+                    className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all ${
+                      activeFilters.includes(hazard.id)
+                        ? 'bg-slate-800/50 border-slate-700 text-white'
+                        : 'bg-slate-950/30 border-slate-900 text-slate-600'
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <span className={`h-2.5 w-2.5 rounded-full ${hazard.color}`} />
-                      <span>{hazard.label}</span>
+                      <div className={`w-2 h-2 rounded-full ${hazard.color}`} />
+                      <span className="text-sm font-medium">{hazard.label}</span>
                     </div>
-                    <span
-                      className={`h-2 w-2 rounded-full ${
-                        active ? "bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.45)]" : "bg-white/10"
-                      }`}
-                    />
+                    {activeFilters.includes(hazard.id) && <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />}
                   </button>
-                );
-              })}
-            </div>
-
-            <div className="mt-5 rounded-2xl border border-white/[0.06] bg-black/16 p-4">
-              <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.24em] text-[#f0f4ff]/32">
-                <Activity className="h-3.5 w-3.5 text-emerald-300" />
-                Heat intensity
-              </div>
-              <div className="mt-3 h-2 rounded-full bg-gradient-to-r from-emerald-400 via-amber-400 to-red-400" />
-              <div className="mt-2 flex justify-between text-[10px] uppercase tracking-[0.18em] text-[#f0f4ff]/25">
-                <span>Safe</span>
-                <span>Moderate</span>
-                <span>Danger</span>
+                ))}
               </div>
             </div>
 
-            <div className="mt-5">
-              <div className="text-[11px] uppercase tracking-[0.24em] text-[#f0f4ff]/32">Live feed</div>
-              <div className="mt-3 space-y-3">
-                {feed.map((item) => (
-                  <div key={item.title} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-                    <div className={`text-sm ${item.tone}`}>{item.title}</div>
-                    <div className="mt-1 text-xs text-[#f0f4ff]/32">{item.time}</div>
+            {/* Severity Legend */}
+            <div className="space-y-4 mb-8">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Heat Intensity</label>
+              <div className="p-3 rounded-xl bg-slate-950/50 border border-slate-800">
+                <div className="h-2 w-full bg-gradient-to-r from-emerald-500 via-amber-500 to-rose-500 rounded-full mb-2" />
+                <div className="flex justify-between text-[8px] font-bold text-slate-500 uppercase tracking-widest">
+                  <span>Safe</span>
+                  <span>Moderate</span>
+                  <span>Danger</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Recent Activity */}
+            <div className="space-y-4">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Live Feed</label>
+              <div className="space-y-3">
+                {recentHazards.map((h, i) => (
+                  <div key={i} className="p-3 rounded-xl bg-slate-950/30 border border-slate-800/50 flex gap-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                      h.severity >= 4 ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'
+                    }`}>
+                      <AlertTriangle size={16} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-bold text-white truncate">{h.type} at {h.location}</div>
+                      <div className="flex items-center gap-1 text-[10px] text-slate-600">
+                        <Clock size={10} />
+                        {h.time}
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
-          </motion.aside>
-        ) : null}
+          </motion.div>
+        )}
       </AnimatePresence>
 
-      {!isOpen ? (
+      {!isOpen && (
         <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
           onClick={() => setIsOpen(true)}
-          className="glass-map rounded-2xl p-3 text-white/65 shadow-[0_18px_50px_rgba(0,0,0,0.34)] transition hover:text-emerald-300"
+          className="p-4 rounded-2xl bg-slate-900 border border-slate-800 text-white hover:bg-slate-800 transition-all shadow-2xl"
         >
-          <Filter className="h-5 w-5" />
+          <Filter size={24} />
         </motion.button>
-      ) : null}
+      )}
     </div>
   );
 }

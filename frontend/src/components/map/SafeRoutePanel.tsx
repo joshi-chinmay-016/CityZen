@@ -1,103 +1,87 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import {
-  ArrowRight,
-  CornerDownLeft,
-  Flag,
-  Loader2,
-  Locate,
-  MapPin,
-  Navigation,
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  MapPin, 
+  Navigation, 
+  ShieldCheck, 
+  AlertTriangle, 
+  Activity, 
+  ChevronRight,
+  Route as RouteIcon,
   Search,
-  Shield,
-  X,
+  Locate,
+  Loader2,
+  X
 } from "lucide-react";
 import { useSafeRoute } from "@/hooks/useSafeRoute";
 import { geocodingService, GeocodingResult } from "@/services/geocodingService";
 
-type SearchField = "source" | "dest" | null;
-
-type SearchState = {
-  suggestions: {
-    source: GeocodingResult[];
-    dest: GeocodingResult[];
-  };
-  loading: {
-    source: boolean;
-    dest: boolean;
-  };
-  highlighted: {
-    source: number;
-    dest: number;
-  };
-};
-
-function splitLocationLabel(displayName: string) {
-  const parts = displayName.split(",").map((part) => part.trim()).filter(Boolean);
-  return {
-    title: parts.slice(0, 2).join(", "),
-    subtitle: parts.slice(2).join(", "),
-  };
-}
-
 export default function SafeRoutePanel() {
   const [sourceText, setSourceText] = useState("");
   const [destText, setDestText] = useState("");
-  const [activeField, setActiveField] = useState<SearchField>(null);
-  const [searchState, setSearchState] = useState<SearchState>({
-    suggestions: { source: [], dest: [] },
-    loading: { source: false, dest: false },
-    highlighted: { source: -1, dest: -1 },
-  });
-  const [isLoadingGeocoding, setIsLoadingGeocoding] = useState(false);
-  const [localError, setLocalError] = useState<string | null>(null);
-
-  const {
-    isLoading: isRouteLoading,
-    error,
-    fetchSafeRoute,
+  
+  const { 
+    routeResult, 
+    isLoading: isRouteLoading, 
+    error, 
+    fetchSafeRoute, 
     resetRoute,
     sourceCoords,
     destinationCoords,
     setSourceCoords,
-    setDestinationCoords,
+    setDestinationCoords
+    ,
+    selectingField,
+    setSelectingField
   } = useSafeRoute();
 
-  const panelRef = useRef<HTMLDivElement | null>(null);
-  const sourceRequestIdRef = useRef(0);
-  const destRequestIdRef = useRef(0);
+  const [sourceSuggestions, setSourceSuggestions] = useState<GeocodingResult[]>([]);
+  const [destSuggestions, setDestSuggestions] = useState<GeocodingResult[]>([]);
+  const sourceDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const destDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  const [isLoadingGeocoding, setIsLoadingGeocoding] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
 
-  const sourceSuggestions = searchState.suggestions.source;
-  const destSuggestions = searchState.suggestions.dest;
-  const activeError = localError || error;
+  // Auto-detect location on mount
+  // NOTE: do not auto-detect on mount anymore. User must choose current or select on map.
 
-  const recentSearches = useMemo(() => {
-    return [
-      sourceText && sourceCoords ? { label: sourceText, coords: sourceCoords } : null,
-      destText && destinationCoords ? { label: destText, coords: destinationCoords } : null,
-    ].filter(Boolean) as Array<{ label: string; coords: [number, number] }>;
-  }, [destinationCoords, destText, sourceCoords, sourceText]);
-
+  // When coords change (including via map selection), reverse-geocode to update the display text
   useEffect(() => {
-    handleUseCurrentLocation();
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (!panelRef.current?.contains(event.target as Node)) {
-        setActiveField(null);
-        setSearchState((current) => ({
-          ...current,
-          suggestions: { source: [], dest: [] },
-          highlighted: { source: -1, dest: -1 },
-        }));
+    const applyReverse = async () => {
+      if (sourceCoords) {
+        try {
+          const addr = await geocodingService.reverseGeocode(sourceCoords[0], sourceCoords[1]);
+          setSourceText(addr);
+        } catch (err) {
+          setSourceText(`${sourceCoords[0].toFixed(4)}, ${sourceCoords[1].toFixed(4)}`);
+        }
       }
     };
+    applyReverse();
+  }, [sourceCoords]);
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+  useEffect(() => {
+    const applyReverse = async () => {
+      if (destinationCoords) {
+        try {
+          const addr = await geocodingService.reverseGeocode(destinationCoords[0], destinationCoords[1]);
+          setDestText(addr);
+        } catch (err) {
+          setDestText(`${destinationCoords[0].toFixed(4)}, ${destinationCoords[1].toFixed(4)}`);
+        }
+      }
+    };
+    applyReverse();
+  }, [destinationCoords]);
+
+  useEffect(() => {
+    return () => {
+      if (sourceDebounceRef.current) clearTimeout(sourceDebounceRef.current);
+      if (destDebounceRef.current) clearTimeout(destDebounceRef.current);
+    };
   }, []);
 
   const handleUseCurrentLocation = useCallback(() => {
@@ -111,188 +95,60 @@ export default function SafeRoutePanel() {
       async (position) => {
         const { latitude, longitude } = position.coords;
         setSourceCoords([latitude, longitude]);
-
+        
         try {
           const address = await geocodingService.reverseGeocode(latitude, longitude);
           setSourceText(address);
-        } catch {
+        } catch (err) {
           setSourceText(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
         } finally {
           setIsLoadingGeocoding(false);
         }
       },
-      () => {
+      (err) => {
         setLocalError("Could not detect your location. Please enter it manually.");
         setIsLoadingGeocoding(false);
       }
     );
   }, [setSourceCoords]);
 
-  useEffect(() => {
-    if (sourceText.trim().length < 3 || activeField !== "source") {
-      setSearchState((current) => ({
-        ...current,
-        suggestions: { ...current.suggestions, source: [] },
-        loading: { ...current.loading, source: false },
-        highlighted: { ...current.highlighted, source: -1 },
-      }));
+  const searchLocations = async (query: string, type: 'source' | 'dest') => {
+    const debounceRef = type === 'source' ? sourceDebounceRef : destDebounceRef;
+    const setSuggestions = type === 'source' ? setSourceSuggestions : setDestSuggestions;
+
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    if (query.length < 3) {
+      setSuggestions([]);
       return;
     }
 
-    const requestId = ++sourceRequestIdRef.current;
-    setSearchState((current) => ({
-      ...current,
-      loading: { ...current.loading, source: true },
-    }));
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const results = await geocodingService.geocodeLocation(query);
+        setSuggestions(results);
+      } catch (err) {
+        console.error(err);
+      }
+    }, 350);
+  };
 
-    const timer = window.setTimeout(async () => {
-      const results = await geocodingService.geocodeLocation(sourceText.trim());
-      if (requestId !== sourceRequestIdRef.current) return;
-
-      setSearchState((current) => ({
-        ...current,
-        suggestions: { ...current.suggestions, source: results },
-        loading: { ...current.loading, source: false },
-        highlighted: { ...current.highlighted, source: results.length ? 0 : -1 },
-      }));
-    }, 220);
-
-    return () => window.clearTimeout(timer);
-  }, [activeField, sourceText]);
-
-  useEffect(() => {
-    if (destText.trim().length < 3 || activeField !== "dest") {
-      setSearchState((current) => ({
-        ...current,
-        suggestions: { ...current.suggestions, dest: [] },
-        loading: { ...current.loading, dest: false },
-        highlighted: { ...current.highlighted, dest: -1 },
-      }));
-      return;
-    }
-
-    const requestId = ++destRequestIdRef.current;
-    setSearchState((current) => ({
-      ...current,
-      loading: { ...current.loading, dest: true },
-    }));
-
-    const timer = window.setTimeout(async () => {
-      const results = await geocodingService.geocodeLocation(destText.trim());
-      if (requestId !== destRequestIdRef.current) return;
-
-      setSearchState((current) => ({
-        ...current,
-        suggestions: { ...current.suggestions, dest: results },
-        loading: { ...current.loading, dest: false },
-        highlighted: { ...current.highlighted, dest: results.length ? 0 : -1 },
-      }));
-    }, 220);
-
-    return () => window.clearTimeout(timer);
-  }, [activeField, destText]);
-
-  const handleSelectLocation = (result: GeocodingResult, type: "source" | "dest") => {
-    if (type === "source") {
+  const handleSelectLocation = (result: GeocodingResult, type: 'source' | 'dest') => {
+    if (type === 'source') {
       setSourceText(result.display_name);
       setSourceCoords([result.latitude, result.longitude]);
+      setSourceSuggestions([]);
     } else {
       setDestText(result.display_name);
       setDestinationCoords([result.latitude, result.longitude]);
-    }
-
-    setSearchState((current) => ({
-      ...current,
-      suggestions: { ...current.suggestions, [type]: [] },
-      highlighted: { ...current.highlighted, [type]: -1 },
-    }));
-    setActiveField(null);
-  };
-
-  const handleInputChange = (value: string, type: "source" | "dest") => {
-    if (type === "source") {
-      setSourceText(value);
-      setSourceCoords(null);
-    } else {
-      setDestText(value);
-      setDestinationCoords(null);
-    }
-
-    setLocalError(null);
-    setActiveField(type);
-  };
-
-  const handleClearField = (type: "source" | "dest") => {
-    if (type === "source") {
-      setSourceText("");
-      setSourceCoords(null);
-    } else {
-      setDestText("");
-      setDestinationCoords(null);
-    }
-
-    setSearchState((current) => ({
-      ...current,
-      suggestions: { ...current.suggestions, [type]: [] },
-      highlighted: { ...current.highlighted, [type]: -1 },
-    }));
-    setActiveField(type);
-  };
-
-  const handleSuggestionKeyDown = (
-    event: React.KeyboardEvent<HTMLInputElement>,
-    type: "source" | "dest"
-  ) => {
-    const suggestions = type === "source" ? sourceSuggestions : destSuggestions;
-    const currentIndex = searchState.highlighted[type];
-
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      if (!suggestions.length) return;
-      setSearchState((current) => ({
-        ...current,
-        highlighted: {
-          ...current.highlighted,
-          [type]: currentIndex < suggestions.length - 1 ? currentIndex + 1 : 0,
-        },
-      }));
-      return;
-    }
-
-    if (event.key === "ArrowUp") {
-      event.preventDefault();
-      if (!suggestions.length) return;
-      setSearchState((current) => ({
-        ...current,
-        highlighted: {
-          ...current.highlighted,
-          [type]: currentIndex > 0 ? currentIndex - 1 : suggestions.length - 1,
-        },
-      }));
-      return;
-    }
-
-    if (event.key === "Enter" && activeField === type && suggestions.length) {
-      event.preventDefault();
-      const selected = suggestions[currentIndex] ?? suggestions[0];
-      if (selected) {
-        handleSelectLocation(selected, type);
-      }
-      return;
-    }
-
-    if (event.key === "Escape") {
-      setSearchState((current) => ({
-        ...current,
-        suggestions: { ...current.suggestions, [type]: [] },
-        highlighted: { ...current.highlighted, [type]: -1 },
-      }));
-      setActiveField(null);
+      setDestSuggestions([]);
     }
   };
 
-  const handleFetchRoute = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const handleFetchRoute = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLocalError(null);
 
     if (!sourceCoords || !destinationCoords) {
@@ -300,270 +156,292 @@ export default function SafeRoutePanel() {
       return;
     }
 
-    setActiveField(null);
     await fetchSafeRoute({
       startLat: sourceCoords[0],
       startLng: sourceCoords[1],
       endLat: destinationCoords[0],
       endLng: destinationCoords[1],
-      preferences: { avoidHighStress: true, prioritizeSafety: true },
+      preferences: { avoidHighStress: true, prioritizeSafety: true }
     });
   };
 
-  const renderSuggestionList = (type: "source" | "dest") => {
-    const suggestions = type === "source" ? sourceSuggestions : destSuggestions;
-    const loading = searchState.loading[type];
-    const highlighted = searchState.highlighted[type];
-
-    if (loading) {
-      return (
-        <div className="flex items-center gap-3 px-4 py-4 text-sm text-[#f0f4ff]/55">
-          <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
-          Searching places across Bengaluru...
-        </div>
-      );
-    }
-
-    if (suggestions.length) {
-      return suggestions.map((result, index) => {
-        const location = splitLocationLabel(result.display_name);
-        const isActive = highlighted === index;
-
-        return (
-          <button
-            key={`${result.latitude}-${result.longitude}-${index}`}
-            type="button"
-            onClick={() => handleSelectLocation(result, type)}
-            className={`flex w-full items-start gap-3 border-b border-white/6 px-4 py-3 text-left transition ${
-              isActive ? "bg-white/[0.05]" : "hover:bg-white/[0.04]"
-            } last:border-b-0`}
-          >
-            <div className={`mt-0.5 rounded-2xl border p-2 ${type === "source" ? "border-emerald-400/16 bg-emerald-500/10 text-emerald-300" : "border-red-400/16 bg-red-500/10 text-red-300"}`}>
-              {type === "source" ? <MapPin className="h-3.5 w-3.5" /> : <Flag className="h-3.5 w-3.5" />}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm text-[#f0f4ff]">{location.title}</div>
-              <div className="mt-1 line-clamp-2 text-xs leading-5 text-[#f0f4ff]/42">
-                {location.subtitle || result.display_name}
-              </div>
-            </div>
-          </button>
-        );
-      });
-    }
-
-    return (
-      <div className="px-4 py-4 text-sm text-[#f0f4ff]/45">
-        Try a more specific landmark, road, or neighborhood.
-      </div>
-    );
+  const getStressLevel = (score: number) => {
+    if (score >= 7) return { text: "High Stress", color: "text-rose-400", bg: "bg-rose-500/20", border: "border-rose-500/30", icon: AlertTriangle };
+    if (score >= 4) return { text: "Moderate Stress", color: "text-amber-400", bg: "bg-amber-500/20", border: "border-amber-500/30", icon: Activity };
+    return { text: "Safe & Low Stress", color: "text-emerald-400", bg: "bg-emerald-500/20", border: "border-emerald-500/30", icon: ShieldCheck };
   };
+
+  const activeError = localError || error;
 
   return (
     <motion.div
-      ref={panelRef}
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.5 }}
-      className="glass-map w-[min(400px,calc(100vw-2rem))] overflow-hidden rounded-[28px] shadow-[0_24px_80px_rgba(0,0,0,0.42)]"
+      transition={{ duration: 0.5, type: "spring", stiffness: 100 }}
+      className="absolute top-6 left-6 z-[1000] w-[380px] bg-slate-900/90 backdrop-blur-xl border border-slate-700/60 shadow-2xl rounded-2xl overflow-hidden flex flex-col max-h-[90vh]"
     >
-      <div className="border-b border-white/[0.06] bg-[linear-gradient(180deg,rgba(13,20,34,0.92),rgba(5,5,5,0.72))] p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl border border-emerald-400/16 bg-emerald-500/10 p-2.5 text-emerald-300">
-                <Shield className="h-4 w-4" />
-              </div>
-              <div>
-                <div className="font-display text-2xl tracking-tight text-[#f0f4ff]">Safe Route Intelligence</div>
-                <div className="mt-1 text-sm text-[#f0f4ff]/45">A calmer, map-native way to search and route.</div>
-              </div>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              resetRoute();
-              setSourceText("");
-              setDestText("");
-              setSourceCoords(null);
-              setDestinationCoords(null);
-              setLocalError(null);
-              setActiveField(null);
-            }}
-            className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-2 text-white/45 transition hover:text-white"
-          >
-            <X className="h-4 w-4" />
-          </button>
+      {/* Header */}
+      <div className="bg-gradient-to-r from-slate-800/80 to-slate-800/40 p-4 border-b border-slate-700/50">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+            <Navigation className="w-5 h-5 text-cyan-400" />
+            Safe Route Intelligence
+          </h2>
+          {(routeResult || sourceCoords || destinationCoords) && (
+             <button 
+              onClick={() => {
+                resetRoute();
+                setSourceText("");
+                setDestText("");
+                setSourceCoords(null);
+                setDestinationCoords(null);
+                setLocalError(null);
+              }} 
+              className="text-[10px] text-slate-500 hover:text-slate-300 underline flex items-center gap-1"
+            >
+              <X className="w-3 h-3" /> Reset
+            </button>
+          )}
         </div>
+        <p className="text-xs text-slate-400 mt-1">AI-powered low-stress navigation</p>
       </div>
 
-      <div className="space-y-5 p-6">
-        <form onSubmit={handleFetchRoute} className="space-y-5">
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <label className="font-mono text-[11px] uppercase tracking-[0.24em] text-[#f0f4ff]/36">Start location</label>
-              <button
-                type="button"
-                onClick={handleUseCurrentLocation}
-                className="inline-flex items-center gap-1 text-[11px] text-cyan-300 transition hover:text-cyan-200"
-              >
-                {isLoadingGeocoding ? <Loader2 className="h-3 w-3 animate-spin" /> : <Locate className="h-3 w-3" />}
-                Current
-              </button>
-            </div>
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-2">
-              <div className="relative">
-                <MapPin className="absolute left-3 top-3.5 h-4 w-4 text-emerald-300" />
-                <input
-                  type="text"
-                  placeholder="From..."
-                  value={sourceText}
-                  onFocus={() => setActiveField("source")}
-                  onChange={(event) => handleInputChange(event.target.value, "source")}
-                  onKeyDown={(event) => handleSuggestionKeyDown(event, "source")}
-                  className="w-full rounded-xl border border-transparent bg-transparent py-3 pl-9 pr-14 text-sm text-[#f0f4ff] outline-none transition placeholder:text-[#f0f4ff]/20 focus:border-emerald-400/18 focus:bg-black/10"
-                />
-                {sourceText ? (
-                  <button
-                    type="button"
-                    onClick={() => handleClearField("source")}
-                    className="absolute right-3 top-3 rounded-full p-0.5 text-white/35 transition hover:bg-white/[0.05] hover:text-white/70"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                ) : null}
+      {/* Input Form */}
+      <div className="p-5 overflow-y-auto custom-scrollbar">
+        <form onSubmit={handleFetchRoute} className="space-y-4">
+          {/* Source Input */}
+          <div className="relative group">
+            <div className="flex items-center justify-between mb-1.5 px-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                <MapPin className="w-3 h-3 text-emerald-400" /> Start Location
+              </label>
+              <div className="flex items-center gap-2">
+                <button 
+                  type="button"
+                  onClick={handleUseCurrentLocation}
+                  className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors"
+                >
+                  {isLoadingGeocoding ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Locate className="w-2.5 h-2.5" />}
+                  Current
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectingField('source');
+                    setLocalError(null);
+                  }}
+                  className={`text-[10px] text-slate-300/90 hover:text-white flex items-center gap-1 transition-colors px-2 py-1 rounded-lg border border-slate-700/40 ${selectingField === 'source' ? 'bg-slate-800/40' : ''}`}
+                >
+                  Select on map
+                </button>
               </div>
             </div>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search start location..."
+                value={sourceText}
+                onChange={(e) => {
+                  setSourceText(e.target.value);
+                  searchLocations(e.target.value, 'source');
+                }}
+                className="w-full bg-slate-950/50 border border-slate-700 rounded-xl py-2.5 pl-10 pr-3 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all"
+              />
+              <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
+            </div>
+            
+            {/* Source Suggestions */}
             <AnimatePresence>
-              {activeField === "source" && (sourceText.trim().length >= 3 || sourceSuggestions.length > 0) ? (
+              {sourceSuggestions.length > 0 && (
                 <motion.div
-                  initial={{ opacity: 0, y: -8 }}
+                  initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  className="mt-3 overflow-hidden rounded-2xl border border-white/[0.06] bg-black/35"
+                  exit={{ opacity: 0, y: -10 }}
+                  className="relative left-0 right-0 mt-2 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-[1100] max-h-60 overflow-y-auto overflow-x-hidden"
                 >
-                  {renderSuggestionList("source")}
+                  {sourceSuggestions.map((res, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => handleSelectLocation(res, 'source')}
+                      className="w-full text-left p-3 hover:bg-slate-700/50 transition-colors border-b border-slate-700/30 last:border-0"
+                    >
+                      <p className="text-xs text-slate-200 line-clamp-1">{res.display_name}</p>
+                    </button>
+                  ))}
                 </motion.div>
-              ) : null}
+              )}
             </AnimatePresence>
           </div>
-
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <label className="font-mono text-[11px] uppercase tracking-[0.24em] text-[#f0f4ff]/36">Destination</label>
-              <span className="text-[11px] text-[#f0f4ff]/28">Use arrow keys and Enter to pick a place</span>
-            </div>
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-2">
-              <div className="relative">
-                <Flag className="absolute left-3 top-3.5 h-4 w-4 text-red-300" />
-                <input
-                  type="text"
-                  placeholder="To..."
-                  value={destText}
-                  onFocus={() => setActiveField("dest")}
-                  onChange={(event) => handleInputChange(event.target.value, "dest")}
-                  onKeyDown={(event) => handleSuggestionKeyDown(event, "dest")}
-                  className="w-full rounded-xl border border-transparent bg-transparent py-3 pl-9 pr-14 text-sm text-[#f0f4ff] outline-none transition placeholder:text-[#f0f4ff]/20 focus:border-emerald-400/18 focus:bg-black/10"
-                />
-                {destText ? (
-                  <button
-                    type="button"
-                    onClick={() => handleClearField("dest")}
-                    className="absolute right-3 top-3 rounded-full p-0.5 text-white/35 transition hover:bg-white/[0.05] hover:text-white/70"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                ) : null}
+          
+          {/* Destination Input */}
+          <div className="relative">
+            <div className="flex items-center mb-1.5 px-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                <MapPin className="w-3 h-3 text-rose-400" /> Destination
+              </label>
+              <div className="ml-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectingField('dest');
+                    setLocalError(null);
+                  }}
+                  className={`text-[10px] text-slate-300/90 hover:text-white flex items-center gap-1 transition-colors px-2 py-1 rounded-lg border border-slate-700/40 ${selectingField === 'dest' ? 'bg-slate-800/40' : ''}`}
+                >
+                  Select on map
+                </button>
               </div>
             </div>
-
-            <AnimatePresence>
-              {activeField === "dest" && (destText.trim().length >= 3 || destSuggestions.length > 0 || recentSearches.length > 0) ? (
-                <motion.div
-                  initial={{ opacity: 0, y: -8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  className="mt-3 overflow-hidden rounded-2xl border border-white/[0.06] bg-black/35"
-                >
-                  {recentSearches.length ? (
-                    <>
-                      <div className="border-b border-white/6 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.24em] text-[#f0f4ff]/28">
-                        Recent picks
-                      </div>
-                      {recentSearches.slice(0, 2).map((item, index) => {
-                        const location = splitLocationLabel(item.label);
-                        return (
-                          <button
-                            key={`${item.label}-${index}`}
-                            type="button"
-                            onClick={() =>
-                              handleSelectLocation(
-                                {
-                                  latitude: item.coords[0],
-                                  longitude: item.coords[1],
-                                  display_name: item.label,
-                                },
-                                "dest"
-                              )
-                            }
-                            className="flex w-full items-start gap-3 border-b border-white/6 px-4 py-3 text-left transition hover:bg-white/[0.04]"
-                          >
-                            <div className="mt-0.5 rounded-2xl border border-white/8 bg-white/[0.03] p-2 text-white/58">
-                              <Navigation className="h-3.5 w-3.5" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="truncate text-sm text-[#f0f4ff]">{location.title}</div>
-                              <div className="mt-1 truncate text-xs text-[#f0f4ff]/40">{location.subtitle || item.label}</div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </>
-                  ) : null}
-                  {renderSuggestionList("dest")}
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
-          </div>
-
-          <div className="flex items-center justify-between rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[11px] text-[#f0f4ff]/42">
-            <div className="flex items-center gap-2">
-              <CornerDownLeft className="h-3.5 w-3.5 text-[#f0f4ff]/26" />
-              Keyboard pick mode enabled
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search destination..."
+                value={destText}
+                onChange={(e) => {
+                  setDestText(e.target.value);
+                  searchLocations(e.target.value, 'dest');
+                }}
+                className="w-full bg-slate-950/50 border border-slate-700 rounded-xl py-2.5 pl-10 pr-3 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all"
+              />
+              <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
             </div>
-            <ArrowRight className="h-3.5 w-3.5 text-[#f0f4ff]/18" />
+
+            {/* Destination Suggestions */}
+            <AnimatePresence>
+              {destSuggestions.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="relative left-0 right-0 mt-2 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-[1100] max-h-60 overflow-y-auto overflow-x-hidden"
+                >
+                  {destSuggestions.map((res, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => handleSelectLocation(res, 'dest')}
+                      className="w-full text-left p-3 hover:bg-slate-700/50 transition-colors border-b border-slate-700/30 last:border-0"
+                    >
+                      <p className="text-xs text-slate-200 line-clamp-1">{res.display_name}</p>
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           <button
             type="submit"
             disabled={isRouteLoading || !sourceCoords || !destinationCoords}
-            className="glow-emerald inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-4 font-medium text-black transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full mt-2 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white font-bold py-3 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed shadow-[0_0_20px_rgba(6,182,212,0.2)] active:scale-[0.98]"
           >
             {isRouteLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
               <>
-                Plan Safe Route
-                <ArrowRight className="h-4 w-4" />
+                Plan Safe Route <ChevronRight className="w-4 h-4" />
               </>
             )}
           </button>
         </form>
 
         <AnimatePresence>
-          {activeError ? (
+          {activeError && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="rounded-2xl border border-red-400/16 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+              className="mt-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-400 flex items-start gap-2"
             >
-              {activeError}
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>{activeError}</span>
             </motion.div>
-          ) : null}
+          )}
         </AnimatePresence>
       </div>
+
+      {/* Results Section */}
+      <AnimatePresence mode="wait">
+        {routeResult && !isRouteLoading && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="p-5 border-t border-slate-700/50 bg-slate-800/30"
+          >
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+              <RouteIcon className="w-3.5 h-3.5" /> Intelligence Report
+            </h3>
+            
+            {/* Status Badge */}
+            {(() => {
+              const level = getStressLevel(routeResult.stress_score);
+              const LevelIcon = level.icon;
+              return (
+                <div className={`flex items-center gap-3 p-4 rounded-xl border ${level.bg} ${level.border} mb-4`}>
+                  <div className={`p-2 rounded-lg ${level.bg} border ${level.border}`}>
+                    <LevelIcon className={`w-5 h-5 ${level.color}`} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <div className={`text-sm font-bold ${level.color}`}>{level.text}</div>
+                      {routeResult.safe ? (
+                         <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-md border border-emerald-500/30 font-bold">OPTIMIZED</span>
+                       ) : (
+                         <span className="text-[10px] bg-rose-500/20 text-rose-400 px-1.5 py-0.5 rounded-md border border-rose-500/30 font-bold">SUB-OPTIMAL</span>
+                       )}
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">
+                       Route Stress Index: <span className="text-slate-200 font-bold">{routeResult.stress_score.toFixed(1)}</span> / 10
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-700/50">
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5 mb-2.5">
+                <ShieldCheck className="w-3 h-3 text-cyan-400" /> Path Analysis
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed italic">
+                "{routeResult.safe 
+                  ? "Our AI has identified a significantly safer path that minimizes exposure to reported hazards and high-stress urban zones." 
+                  : "Attention: No alternate safe path found within search radius. The current route contains elevated stress segments."}"
+              </p>
+              <div className="mt-3 flex items-center gap-4 border-t border-slate-700/30 pt-3">
+                 <div className="text-center flex-1">
+                   <div className="text-[10px] text-slate-500 uppercase mb-0.5">Checkpoints</div>
+                   <div className="text-xs font-bold text-slate-200">{routeResult.route.length}</div>
+                 </div>
+                 <div className="w-px h-6 bg-slate-700/50" />
+                 <div className="text-center flex-1">
+                   <div className="text-[10px] text-slate-500 uppercase mb-0.5">Safety Rating</div>
+                   <div className="text-xs font-bold text-emerald-400">{(100 - (routeResult.stress_score * 10)).toFixed(0)}%</div>
+                 </div>
+              </div>
+            </div>
+
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #334155;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #475569;
+        }
+      `}</style>
     </motion.div>
   );
 }

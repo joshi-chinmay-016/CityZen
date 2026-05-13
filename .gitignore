@@ -85,4 +85,6 @@ ml-service/models/*.joblib
 ml-service/models/*.onnx
 ml-service/logs/
 ml-service/checkpoints/
+**/__pycache__/
+**/*.pyc
 

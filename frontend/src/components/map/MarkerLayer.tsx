@@ -6,11 +6,6 @@ MODULE: Hazard Report Marker Layer
 import { Marker, Popup } from "react-leaflet";
 import { useReports } from "@/hooks/useReports";
 import HazardPopup from "./HazardPopup";
-import type { Report } from "@/services/reportService";
-
-const hasValidCoordinates = (report: Report): boolean => {
-  return Number.isFinite(report.latitude) && Number.isFinite(report.longitude);
-};
 
 export default function MarkerLayer() {
   const { reports, isLoading, error } = useReports();
@@ -31,21 +26,27 @@ export default function MarkerLayer() {
     return null;
   }
 
-  const validReports = reports.filter(hasValidCoordinates);
-
-  if (validReports.length === 0) {
-    return null;
-  }
+  // Filter out any malformed reports without valid numeric coordinates
+  const validReports = reports.filter(r => {
+    if (!r) return false;
+    const lat = Number((r as any).latitude);
+    const lng = Number((r as any).longitude);
+    return Number.isFinite(lat) && Number.isFinite(lng);
+  });
 
   return (
     <>
-      {validReports.map((report) => (
-        <Marker key={report.id} position={[report.latitude, report.longitude]}>
-          <Popup>
-            <HazardPopup report={report} />
-          </Popup>
-        </Marker>
-      ))}
+      {validReports.map((report) => {
+        const lat = Number((report as any).latitude);
+        const lng = Number((report as any).longitude);
+        return (
+          <Marker key={report.id} position={[lat, lng]}>
+            <Popup>
+              <HazardPopup report={report} />
+            </Popup>
+          </Marker>
+        );
+      })}
     </>
   );
 }

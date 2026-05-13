@@ -24,16 +24,35 @@ let serviceAccount;
 // Get path from .env
 const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
-if (!credentialsPath) {
-  throw new Error("Missing GOOGLE_APPLICATION_CREDENTIALS in .env file");
+// Helper: search for a default service account file by walking up directories
+function findServiceAccountUpwards(filename, maxDepth = 4) {
+  let dir = process.cwd();
+  for (let i = 0; i <= maxDepth; i++) {
+    const candidate = path.join(dir, filename);
+    if (fs.existsSync(candidate)) return candidate;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
 }
 
-// Resolve absolute path (adjusted for src directory)
-const resolvedPath = path.resolve(process.cwd(), credentialsPath);
-
-// Check if file exists
-if (!fs.existsSync(resolvedPath)) {
-  throw new Error(`Service account key not found at: ${resolvedPath}`);
+let resolvedPath;
+if (credentialsPath) {
+  // Resolve absolute path (relative to current working directory)
+  resolvedPath = path.resolve(process.cwd(), credentialsPath);
+  if (!fs.existsSync(resolvedPath)) {
+    throw new Error(`Service account key not found at: ${resolvedPath}`);
+  }
+} else {
+  // Fallback: try to find serviceAccountKey.json in current or parent folders
+  const found = findServiceAccountUpwards("serviceAccountKey.json", 4);
+  if (!found) {
+    throw new Error(
+      "Missing GOOGLE_APPLICATION_CREDENTIALS in .env file and no serviceAccountKey.json found. Please set GOOGLE_APPLICATION_CREDENTIALS or place a serviceAccountKey.json in a parent folder."
+    );
+  }
+  resolvedPath = found;
 }
 
 // Load JSON properly
