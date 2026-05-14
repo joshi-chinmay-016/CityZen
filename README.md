@@ -708,6 +708,4 @@ This project is part of a smart-city initiative. Refer to repository for license
 
 ---
 
-
-
-
+---
