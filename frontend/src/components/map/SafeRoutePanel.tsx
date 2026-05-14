@@ -31,10 +31,11 @@ export default function SafeRoutePanel() {
     sourceCoords,
     destinationCoords,
     setSourceCoords,
-    setDestinationCoords
-    ,
+    setDestinationCoords,
     selectingField,
-    setSelectingField
+    setSelectingField,
+    selectedRouteIndex,
+    setSelectedRouteIndex
   } = useSafeRoute();
 
   const [sourceSuggestions, setSourceSuggestions] = useState<GeocodingResult[]>([]);
@@ -369,35 +370,78 @@ export default function SafeRoutePanel() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className="p-5 border-t border-slate-700/50 bg-slate-800/30"
+            className="p-5 border-t border-slate-700/50 bg-slate-800/30 overflow-y-auto max-h-[400px] custom-scrollbar"
           >
             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <RouteIcon className="w-3.5 h-3.5" /> Intelligence Report
+              <RouteIcon className="w-3.5 h-3.5" /> Intelligent Route Options
             </h3>
             
+            <div className="space-y-4">
+              {routeResult.routes.map((candidate, index) => {
+                const level = getStressLevel(candidate.stress_score);
+                const LevelIcon = level.icon;
+                const isSelected = selectedRouteIndex === index;
+                
+                return (
+                  <div 
+                    key={index}
+                    onClick={() => setSelectedRouteIndex(index)}
+                    className={`p-4 rounded-xl border transition-all cursor-pointer group relative ${
+                      isSelected 
+                        ? `${level.bg} ${level.border} ring-2 ring-offset-2 ring-offset-slate-900 ${level.border.replace('border-', 'ring-')} scale-[1.02] shadow-lg` 
+                        : 'bg-slate-900/40 border-slate-700/50 hover:bg-slate-800/60 hover:border-slate-600'
+                    }`}
+                  >
+                    {isSelected && (
+                      <div className={`absolute -top-2 -right-2 ${level.bg} ${level.color} px-2 py-0.5 rounded-full text-[9px] font-bold border ${level.border} shadow-lg z-10`}>
+                        SELECTED
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className={`p-1.5 rounded-lg ${level.bg} border ${level.border}`}>
+                          <LevelIcon className={`w-4 h-4 ${level.color}`} />
+                        </div>
+                        <span className={`text-sm font-bold ${level.color} capitalize`}>{candidate.type}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-slate-400">Score: {candidate.stress_score.toFixed(1)}</span>
+                        <span className={`text-[10px] ${candidate.safe ? 'text-emerald-400 bg-emerald-500/10' : 'text-rose-400 bg-rose-500/10'} px-1.5 py-0.5 rounded border border-current/20 font-bold uppercase`}>
+                          {candidate.safe ? 'Safe' : 'Risky'}
+                        </span>
+                      </div>
+                    </div>
 
-            <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-700/50">
-              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5 mb-2.5">
-                <ShieldCheck className="w-3 h-3 text-cyan-400" /> Path Analysis
-              </div>
-              <p className="text-xs text-slate-400 leading-relaxed italic">
-                "{routeResult.safe 
-                  ? "Our AI has identified a significantly safer path that minimizes exposure to reported hazards and high-stress urban zones." 
-                  : "Attention: No alternate safe path found within search radius. The current route contains elevated stress segments."}"
-              </p>
-              <div className="mt-3 flex items-center gap-4 border-t border-slate-700/30 pt-3">
-                 <div className="text-center flex-1">
-                   <div className="text-[10px] text-slate-500 uppercase mb-0.5">Checkpoints</div>
-                   <div className="text-xs font-bold text-slate-200">{routeResult.route.length}</div>
-                 </div>
-                 <div className="w-px h-6 bg-slate-700/50" />
-                 <div className="text-center flex-1">
-                   <div className="text-[10px] text-slate-500 uppercase mb-0.5">Safety Rating</div>
-                   <div className="text-xs font-bold text-emerald-400">{(100 - (routeResult.stress_score * 10)).toFixed(0)}%</div>
-                 </div>
-              </div>
+                    <div className="grid grid-cols-2 gap-4 mt-2 pt-3 border-t border-slate-700/30">
+                      <div>
+                        <p className="text-[10px] text-slate-500 uppercase mb-0.5">Distance</p>
+                        <p className="text-xs font-bold text-slate-200">{(candidate.distance / 1000).toFixed(1)} km</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-slate-500 uppercase mb-0.5">Est. Time</p>
+                        <p className="text-xs font-bold text-slate-200">{Math.round(candidate.duration / 60)} min</p>
+                      </div>
+                    </div>
+
+                    {candidate.nearby_hazards.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-slate-700/30">
+                        <p className="text-[10px] text-slate-500 uppercase mb-1.5">Nearby Hazards Detected</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {Array.from(new Set(candidate.nearby_hazards.map(h => h.hazard))).slice(0, 3).map((h, i) => (
+                            <span key={i} className="text-[9px] bg-slate-900/50 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700 capitalize">
+                              {h}
+                            </span>
+                          ))}
+                          {new Set(candidate.nearby_hazards.map(h => h.hazard)).size > 3 && (
+                            <span className="text-[9px] text-slate-500">+{new Set(candidate.nearby_hazards.map(h => h.hazard)).size - 3} more</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-
           </motion.div>
         )}
       </AnimatePresence>

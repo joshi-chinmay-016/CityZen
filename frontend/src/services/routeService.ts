@@ -12,7 +12,18 @@ export interface RouteRequest {
   };
 }
 
+export interface RouteCandidate {
+  type: 'safe' | 'moderate' | 'risky';
+  stress_score: number;
+  safe: boolean;
+  distance: number;
+  duration: number;
+  route: RouteCoordinate[];
+  nearby_hazards: any[];
+}
+
 export interface SafeRouteResponse {
+  routes: RouteCandidate[];
   stress_score: number;
   safe: boolean;
   route: RouteCoordinate[];
