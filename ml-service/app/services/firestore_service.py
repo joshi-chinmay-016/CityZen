@@ -35,21 +35,49 @@ class FirestoreService:
         self._ensure_firestore_client()
 
     def save_prediction(self, report: dict):
+        """
+        Saves the prediction by calling the Backend API.
+        This ensures unified logic for Firestore storage and local fallback caching.
+        """
+        import json
+        import urllib.request
+        from urllib.error import URLError
+
         try:
             self._validate_report(report)
-            db = self._ensure_firestore_client()
-            db.collection(settings.firestore_reports_collection).document(report["id"]).set(report)
-            logger.info(
-                "Saved prediction to Firestore collection=%s document_id=%s",
-                settings.firestore_reports_collection,
-                report.get("id"),
-            )
+            
+            # Prepare data for Backend API
+            # Backend expects 'type' or 'hazard', 'latitude'/'longitude' or 'lat'/'lng'
+            payload = {
+                "id": report["id"], # CRITICAL: Ensure ID consistency
+                "latitude": report["latitude"],
+                "longitude": report["longitude"],
+                "hazard": report["hazard"],
+                "severity": report["severity"],
+                "confidence": report["confidence"],
+                "timestamp": report["timestamp"],
+                "description": "AI detected hazard"
+            }
+
+            backend_url = "http://localhost:5000/reports" # Adjust if your backend port is different
+            req = urllib.request.Request(backend_url)
+            req.add_header('Content-Type', 'application/json; charset=utf-8')
+            jsondata = json.dumps(payload)
+            jsondataasbytes = jsondata.encode('utf-8')
+            req.add_header('Content-Length', len(jsondataasbytes))
+
+            try:
+                with urllib.request.urlopen(req, timeout=5) as response:
+                    logger.info("Successfully synced prediction to Backend API. Status: %s", response.status)
+            except (URLError, Exception) as api_err:
+                logger.warning("Backend API unavailable (%s). Falling back to direct Firestore save.", str(api_err))
+                # Fallback: Save directly to Firestore if Backend is down
+                db = self._ensure_firestore_client()
+                db.collection(settings.firestore_reports_collection).document(report["id"]).set(report)
+                logger.info("Saved prediction directly to Firestore (Backend fallback).")
+
         except Exception:
-            logger.exception(
-                "Failed to save prediction to Firestore collection=%s document_id=%s",
-                settings.firestore_reports_collection,
-                report.get("id"),
-            )
+            logger.exception("Failed to save prediction.")
             raise
         return report
 

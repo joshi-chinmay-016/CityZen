@@ -17,6 +17,7 @@ import L from 'leaflet';
 import { useEffect } from 'react';
 import { useMapEvents } from 'react-leaflet';
 import { geocodingService } from '@/services/geocodingService';
+import { Loader2 } from "lucide-react";
 
 // Custom icons
 const sourceIcon = new L.Icon({
@@ -58,10 +59,18 @@ export default function LeafletMap() {
   console.log("LeafletMap routeData", routeResult);
 
   return (
-    <div
-      className="h-screen w-full relative"
-      style={{ height: "100vh", width: "100vw" }}
-    >
+    <div className="h-screen w-full relative">
+      {/* Map Controls */}
+      <div className="absolute top-6 right-6 z-[1000] flex flex-col gap-3">
+        <button
+          onClick={() => window.location.reload()}
+          className="p-4 bg-slate-900/80 backdrop-blur-xl border border-slate-700 rounded-2xl text-emerald-400 hover:bg-slate-800 hover:scale-110 transition-all shadow-2xl group"
+          title="Refresh Markers"
+        >
+          <Loader2 className="group-hover:animate-spin" size={24} />
+        </button>
+      </div>
+
       <MapContainer
         center={bangaloreCenter}
         zoom={13}

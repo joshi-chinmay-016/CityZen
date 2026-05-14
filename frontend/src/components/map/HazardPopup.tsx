@@ -84,7 +84,7 @@ export default function HazardPopup({ report }: HazardPopupProps) {
         <span
           className={`px-3 py-1 rounded-full text-sm font-semibold ${badgeColor}`}
         >
-          {report.severity.toUpperCase()}
+          {(report.severity || 'Medium').toUpperCase()}
         </span>
       </div>
 

@@ -106,14 +106,112 @@ const getIntensityFromSeverity = (severity) => {
 const firestoreService = {
   add: async (collection, data) => {
     try {
-      const docRef = await db.collection(collection).add({
+      // 1. Primary: Attempt to save to Firestore
+      // Use specific ID if provided, otherwise let Firestore generate one
+      const docId = data.id || null;
+      let docRef;
+      
+      const payload = {
         ...data,
-        timestamp: Date.now()
-      });
-      return docRef;
+        timestamp: data.timestamp || new Date().toISOString()
+      };
+      // Don't save the ID inside the document data if we use it as the document key
+      if (payload.id) delete payload.id;
+
+      if (docId) {
+        docRef = db.collection(collection).doc(docId);
+        await docRef.set(payload, { merge: true });
+        console.log(`[Firestore] Document ${docId} set/updated.`);
+      } else {
+        docRef = await db.collection(collection).add(payload);
+        console.log(`[Firestore] New document created with ID: ${docRef.id}`);
+      }
+
+      const finalId = docId || docRef.id;
+
+      // 2. Sync to Local Cache: Ensure the report is visible even in f      // Fallback/Parallel Sync: Ensure local cache is always updated
+      if (collection.toLowerCase() === COLLECTION.toLowerCase()) {
+        try {
+          const cacheDir = path.dirname(CACHE_FILE_PATH);
+          if (!fs.existsSync(cacheDir)) {
+            fs.mkdirSync(cacheDir, { recursive: true });
+          }
+
+          let cache = [];
+          if (fs.existsSync(CACHE_FILE_PATH)) {
+            try {
+              const rawData = fs.readFileSync(CACHE_FILE_PATH, 'utf8');
+              cache = JSON.parse(rawData);
+            } catch (pErr) {
+              console.error('[Cache] JSON parse error, resetting cache:', pErr.message);
+              cache = [];
+            }
+          }
+          
+          const normalizeSeverity = (s) => {
+            if (!s) return 'Medium';
+            const str = String(s).toLowerCase();
+            if (str === 'low') return 'Low';
+            if (str === 'high') return 'High';
+            if (str === 'critical') return 'Critical';
+            return 'Medium';
+          };
+          
+          const newReport = {
+            id: finalId,
+            latitude: Number(data.latitude ?? data.lat),
+            longitude: Number(data.longitude ?? data.lng),
+            hazard: String(data.hazard || data.type || 'unknown').toLowerCase(),
+            severity: normalizeSeverity(data.severity),
+            confidence: Number(data.confidence ?? 0.9),
+            timestamp: data.timestamp || new Date().toISOString()
+          };
+
+          const existingIndex = cache.findIndex(r => r.id === finalId);
+          if (existingIndex > -1) {
+            cache[existingIndex] = newReport;
+          } else {
+            cache.push(newReport);
+          }
+          
+          fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(cache, null, 2), 'utf8');
+          console.log(`[Cache Sync Success] ID: ${finalId} - Saved to ${CACHE_FILE_PATH}`);
+        } catch (cacheErr) {
+          console.error('[Cache Error] Local sync failed:', cacheErr.message);
+        }
+      }
+
+      return { id: finalId };
     } catch (error) {
       console.error(`[Firestore Error] Add failed: ${error.message}`);
-      return { id: 'mock-' + Date.now() };
+      
+      const mockId = data.id || 'local-' + Date.now();
+      if (collection.toLowerCase() === COLLECTION.toLowerCase()) {
+        try {
+          let cache = [];
+          if (fs.existsSync(CACHE_FILE_PATH)) {
+            const rawData = fs.readFileSync(CACHE_FILE_PATH, 'utf8');
+            cache = JSON.parse(rawData);
+          }
+          const newReport = {
+            id: mockId,
+            latitude: Number(data.latitude ?? data.lat),
+            longitude: Number(data.longitude ?? data.lng),
+            hazard: String(data.hazard || data.type || 'unknown').toLowerCase(),
+            severity: String(data.severity || 'medium').toLowerCase(),
+            confidence: Number(data.confidence ?? 0.9),
+            timestamp: data.timestamp || new Date().toISOString()
+          };
+          const existingIndex = cache.findIndex(r => r.id === mockId);
+          if (existingIndex > -1) cache[existingIndex] = newReport;
+          else cache.push(newReport);
+          fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(cache, null, 2));
+          console.log(`[Emergency Cache Success] ID: ${mockId} (Firestore Offline)`);
+        } catch (cacheErr) {
+          console.error('[Cache Error] Emergency save failed:', cacheErr.message);
+        }
+      }
+      return { id: mockId };
     }
   },
 
@@ -132,13 +230,45 @@ const firestoreService = {
 
   getAllReports: async () => {
     try {
-      const reports = await fetchAllReports();
-      if (!reports || reports.length === 0) {
-        return loadFallbackCache().map(normalizeReport);
+      // 1. Fetch from Cache
+      const cachedReports = loadFallbackCache();
+      const allReportsMap = new Map();
+      
+      cachedReports.forEach(r => {
+        const normalized = normalizeReport(r);
+        if (normalized.id) allReportsMap.set(normalized.id, normalized);
+      });
+      
+      // 2. Fetch from Live Firestore
+      let liveReports = [];
+      try {
+        liveReports = await fetchAllReports();
+        
+        // Update map with live data (overwrites cache if ID matches)
+        liveReports.forEach(r => {
+          const normalized = normalizeReport(r);
+          if (normalized.id) {
+            allReportsMap.set(normalized.id, normalized);
+          }
+        });
+
+        // 3. PROACTIVE SYNC: Write back merged data to local cache
+        // This ensures the local JSON stays up-to-date with live Firestore
+        const mergedArray = Array.from(allReportsMap.values());
+        try {
+          fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(mergedArray, null, 2), 'utf8');
+          console.log(`[Cache Sync] Proactively updated local cache with ${mergedArray.length} reports.`);
+        } catch (syncErr) {
+          console.error('[Cache Sync Warning] Periodic write failed:', syncErr.message);
+        }
+
+      } catch (err) {
+        console.warn('[Firestore] Query failed during getAllReports, serving cached data only.');
       }
-      return reports.map(normalizeReport);
+
+      return Array.from(allReportsMap.values());
     } catch (error) {
-      console.error('[Firestore] Quota exceeded or Timeout. Triggering local cache fallback.');
+      console.error('[Firestore] Critical failure in getAllReports:', error.message);
       return loadFallbackCache().map(normalizeReport);
     }
   },

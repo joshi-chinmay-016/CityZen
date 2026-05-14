@@ -3,6 +3,7 @@ OWNER: Sushanth
 MODULE: Hazard Report Marker Layer
 */
 
+import { useEffect } from 'react';
 import { Marker, Popup } from "react-leaflet";
 import { useReports } from "@/hooks/useReports";
 import HazardPopup from "./HazardPopup";
@@ -10,6 +11,13 @@ import { getHazardIcon } from '@/lib/markerIcons';
 
 export default function MarkerLayer() {
   const { reports, isLoading, error } = useReports();
+
+  // Debug data flow
+  useEffect(() => {
+    if (reports && reports.length > 0) {
+      console.log(`[MarkerLayer] Received ${reports.length} reports.`);
+    }
+  }, [reports]);
 
   // Handle loading state
   if (isLoading) {

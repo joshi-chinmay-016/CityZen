@@ -4,6 +4,11 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   AlertTriangle, 
+  AlertCircle,
+  Activity,
+  Trash2,
+  Droplets,
+  Zap,
   MapPin, 
   Camera, 
   Upload, 
@@ -83,6 +88,64 @@ export default function ReportsPage() {
     { name: 'Mike Road', points: 2900, rank: 3, badge: 'Watchman' },
   ];
 
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<GeocodingResult[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [lastReportId, setLastReportId] = useState<string | null>(null);
+
+  const hazardOptions = [
+    { id: 'pothole', label: 'Pothole', icon: AlertTriangle },
+    { id: 'manhole', label: 'Open Manhole', icon: AlertCircle },
+    { id: 'crack', label: 'Road Crack', icon: Activity },
+    { id: 'garbage', label: 'Waste Pile', icon: Trash2 },
+    { id: 'waterlog', label: 'Water Logging', icon: Droplets },
+    { id: 'street_light', label: 'Broken Street Light', icon: Zap },
+  ];
+
+  // DEBOUNCED SEARCH FOR SUGGESTIONS
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (locationQuery.length >= 3 && !coords) {
+        const results = await geocodingService.geocodeLocation(locationQuery);
+        setSuggestions(results);
+        setShowSuggestions(true);
+      } else {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [locationQuery, coords]);
+
+  const handleGeocode = async (query: string) => {
+    if (!query || query.length < 3) return;
+    setIsLocating(true);
+    try {
+      const results = await geocodingService.geocodeLocation(query);
+      if (results && results.length > 0) {
+        const topResult = results[0];
+        setCoords([topResult.latitude, topResult.longitude]);
+        setLocationQuery(topResult.display_name);
+        setShowSuggestions(false);
+        toast.success(`Location resolved: ${topResult.display_name.split(',')[0]}`);
+      } else {
+        toast.error('Could not find location coordinates.');
+      }
+    } catch (err) {
+      toast.error('Location search failed.');
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
+  const handleSelectSuggestion = (suggestion: GeocodingResult) => {
+    setCoords([suggestion.latitude, suggestion.longitude]);
+    setLocationQuery(suggestion.display_name);
+    setSuggestions([]);
+    setShowSuggestions(false);
+    toast.success('Location selected from suggestions');
+  };
+
   const handleUseCurrentLocation = () => {
     setIsLocating(true);
     if (navigator.geolocation) {
@@ -109,12 +172,19 @@ export default function ReportsPage() {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      if (!coords) {
-        toast.error('Please detect your location first so the AI can geotag the report.');
+      const file = e.target.files[0];
+      const objectUrl = URL.createObjectURL(file);
+      setPreviewUrl(objectUrl);
+
+      if (!coords && !locationQuery) {
+        toast.error('Please specify a location first.');
         return;
       }
 
-      const file = e.target.files[0];
+      if (!coords && locationQuery) {
+        await handleGeocode(locationQuery);
+      }
+
       setUploadProgress(10);
       setAiVerified(false);
       setStep(1);
@@ -122,27 +192,43 @@ export default function ReportsPage() {
       try {
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('latitude', coords[0].toString());
-        formData.append('longitude', coords[1].toString());
+        const lat = coords?.[0] || 12.9716;
+        const lng = coords?.[1] || 77.5946;
+        formData.append('latitude', lat.toString());
+        formData.append('longitude', lng.toString());
 
         setUploadProgress(30);
         const result = await reportService.uploadReport(formData);
         setUploadProgress(100);
 
         if (result && result.predictions && result.predictions.length > 0) {
-          const prediction = result.predictions[0];
-          setHazardType(prediction.label || 'pothole');
+          const predictions = [...result.predictions].sort((a, b) => b.confidence - a.confidence);
+          const topPrediction = predictions[0];
+          
+          setLastReportId(topPrediction.id);
+          setHazardType(topPrediction.label || 'pothole');
           setAiVerified(true);
           setStep(2);
-          toast.success(`AI Verified: ${prediction.label} detected with ${Math.round(prediction.confidence * 100)}% confidence`);
+          
+          // IMPROVED AI RECOMMENDATION: Nuanced severity based on hazard + confidence
+          let recommendedSeverity = 3; // Default Medium
+          if (topPrediction.label === 'manhole' || topPrediction.label === 'open_manhole') recommendedSeverity = 5;
+          else if (topPrediction.label === 'pothole') {
+            recommendedSeverity = topPrediction.confidence > 0.8 ? 5 : 4;
+          } else if (topPrediction.label === 'crack') {
+            recommendedSeverity = topPrediction.confidence > 0.8 ? 3 : 2;
+          }
+          setSeverity(recommendedSeverity);
+
+          toast.success(`AI Recommended: ${topPrediction.label} (Confidence: ${Math.round(topPrediction.confidence * 100)}%)`);
         } else {
           setAiVerified(false);
-          toast.error('AI could not confidently identify a hazard in this image.');
+          toast.error('AI analysis was inconclusive. Please ensure the hazard is visible.');
         }
       } catch (err) {
         console.error('AI Verification failed:', err);
         setUploadProgress(0);
-        toast.error('AI Verification service unavailable.');
+        toast.error('AI service temporarily busy.');
       }
     }
   };
@@ -153,28 +239,18 @@ export default function ReportsPage() {
     
     setIsSubmitting(true);
     try {
-      // The ML service already saves the report if called via uploadReport
-      // But we call createReport here to ensure it's finalized with user-provided description/severity
       await reportService.createReport({
+        id: lastReportId || undefined,
         type: hazardType,
         severity,
         description,
         latitude: coords[0],
         longitude: coords[1],
-        imageUrl: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?q=80&w=1470&auto=format&fit=crop'
-      });
-      toast.success('Report synchronized to safety map!');
-      setStep(4);
+        imageUrl: previewUrl || 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?q=80&w=1470&auto=format&fit=crop'
+      } as any);
       
-      // Reset form after a delay
-      setTimeout(() => {
-        setStep(1);
-        setAiVerified(false);
-        setUploadProgress(0);
-        setDescription('');
-        setLocationQuery('');
-        setCoords(null);
-      }, 5000);
+      toast.success('Hazard verified and marked on the live map!');
+      setStep(4);
     } catch (error) {
       toast.error('Failed to sync report to map');
     } finally {
@@ -248,29 +324,86 @@ export default function ReportsPage() {
                   </div>
                 </div>
 
-                {/* Location Search */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Location</label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={18} />
-                      <input 
-                        type="text"
-                        placeholder="Search location or enter coordinates..."
-                        value={locationQuery}
-                        onChange={(e) => setLocationQuery(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-emerald-500/50 transition-all"
-                      />
+                {/* Hazard Type Selection */}
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center justify-between">
+                    <span>Hazard Category</span>
+                    {aiVerified && <span className="text-emerald-500 flex items-center gap-1"><ShieldCheck size={12} /> AI Suggested</span>}
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {hazardOptions.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setHazardType(opt.id)}
+                        className={`p-3 rounded-xl border transition-all flex flex-col items-center gap-2 group ${
+                          hazardType === opt.id 
+                            ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400' 
+                            : 'bg-slate-800/30 border-slate-700/50 text-slate-500 hover:border-slate-600 hover:text-slate-300'
+                        }`}
+                      >
+                        <opt.icon size={20} className={hazardType === opt.id ? 'text-emerald-400' : 'text-slate-600 group-hover:text-slate-400'} />
+                        <span className="text-[10px] font-bold uppercase tracking-tight">{opt.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Location Selection with Preview */}
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center justify-between">
+                    <span>Location Information</span>
+                    {coords && <span className="text-emerald-500 text-[10px]">COORDS: {coords[0].toFixed(4)}, {coords[1].toFixed(4)}</span>}
+                  </label>
+                  
+                  <div className="relative">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          value={locationQuery}
+                          onChange={(e) => {
+                            setLocationQuery(e.target.value);
+                            if (coords) setCoords(null);
+                          }}
+                          placeholder="Enter hazard location..."
+                          className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-4 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+                        />
+                        {isLocating && (
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                            <Loader2 className="animate-spin text-emerald-500" size={20} />
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleUseCurrentLocation}
+                        className="px-4 bg-slate-800/50 border border-slate-700 rounded-xl text-slate-400 hover:text-emerald-400 transition-colors"
+                        title="Use current location"
+                      >
+                        <MapPin size={24} />
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleUseCurrentLocation}
-                      disabled={isLocating}
-                      className="px-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl hover:bg-emerald-500/20 transition-all flex items-center gap-2"
-                    >
-                      {isLocating ? <Loader2 className="animate-spin" size={18} /> : <MapPin size={18} />}
-                      <span className="hidden sm:inline font-bold text-sm">Locate</span>
-                    </button>
+
+                    {/* Suggestions Dropdown */}
+                    {showSuggestions && suggestions.length > 0 && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="absolute z-50 left-0 right-0 mt-2 bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-2xl shadow-black/50"
+                      >
+                        {suggestions.map((suggestion, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => handleSelectSuggestion(suggestion)}
+                            className="w-full px-4 py-3 text-left text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors border-b border-slate-800 last:border-0 flex items-start gap-3"
+                          >
+                            <MapPin size={16} className="mt-1 flex-shrink-0 text-emerald-500" />
+                            <span>{suggestion.display_name}</span>
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
                   </div>
                 </div>
 
@@ -286,19 +419,47 @@ export default function ReportsPage() {
                   />
                 </div>
 
-                {/* Submit Button */}
-                <button
-                  type="submit"
-                  disabled={isSubmitting || !aiVerified}
-                  className={`w-full py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2 ${
-                    aiVerified 
-                      ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]' 
-                      : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                  }`}
-                >
-                  {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle size={20} />}
-                  Complete Report
-                </button>
+                {step === 4 ? (
+                  <div className="space-y-4">
+                    <button
+                      type="button"
+                      onClick={() => window.location.href = '/map'}
+                      className="w-full py-4 rounded-xl font-bold text-lg bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all flex items-center justify-center gap-2"
+                    >
+                      <MapPin size={20} />
+                      View on Live Map
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStep(1);
+                        setAiVerified(false);
+                        setUploadProgress(0);
+                        setDescription('');
+                        setLocationQuery('');
+                        setCoords(null);
+                        setPreviewUrl(null);
+                        setLastReportId(null);
+                      }}
+                      className="w-full py-3 text-slate-400 font-bold hover:text-white transition-colors"
+                    >
+                      Report Another Hazard
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || !aiVerified}
+                    className={`w-full py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2 ${
+                      aiVerified 
+                        ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]' 
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                    }`}
+                  >
+                    {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle size={20} />}
+                    Complete Report
+                  </button>
+                )}
               </form>
             </motion.div>
 
@@ -316,7 +477,7 @@ export default function ReportsPage() {
                       {aiVerified ? (
                         <>
                           <img 
-                            src="https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?q=80&w=1470&auto=format&fit=crop" 
+                            src={previewUrl || "https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?q=80&w=1470&auto=format&fit=crop"} 
                             className="w-full h-full object-cover opacity-50"
                             alt="Preview"
                           />

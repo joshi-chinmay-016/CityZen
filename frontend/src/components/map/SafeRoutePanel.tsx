@@ -375,31 +375,6 @@ export default function SafeRoutePanel() {
               <RouteIcon className="w-3.5 h-3.5" /> Intelligence Report
             </h3>
             
-            {/* Status Badge */}
-            {(() => {
-              const level = getStressLevel(routeResult.stress_score);
-              const LevelIcon = level.icon;
-              return (
-                <div className={`flex items-center gap-3 p-4 rounded-xl border ${level.bg} ${level.border} mb-4`}>
-                  <div className={`p-2 rounded-lg ${level.bg} border ${level.border}`}>
-                    <LevelIcon className={`w-5 h-5 ${level.color}`} />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <div className={`text-sm font-bold ${level.color}`}>{level.text}</div>
-                      {routeResult.safe ? (
-                         <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-md border border-emerald-500/30 font-bold">OPTIMIZED</span>
-                       ) : (
-                         <span className="text-[10px] bg-rose-500/20 text-rose-400 px-1.5 py-0.5 rounded-md border border-rose-500/30 font-bold">SUB-OPTIMAL</span>
-                       )}
-                    </div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">
-                       Route Stress Index: <span className="text-slate-200 font-bold">{routeResult.stress_score.toFixed(1)}</span> / 10
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
 
             <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-700/50">
               <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5 mb-2.5">
