@@ -33,6 +33,7 @@ const Navbar = () => {
           <Link href="/dashboard" className="text-sm text-white hover:text-gray-300 transition-colors">Dashboard</Link>
           <Link href="/reports" className="text-sm text-white hover:text-gray-300 transition-colors">Reports</Link>
           <Link href="/delivery" className="text-sm text-white hover:text-gray-300 transition-colors">Driver Feedback</Link>
+          <Link href="/simulate" className="text-sm text-white hover:text-gray-300 transition-colors">Sensor Data</Link>
         </div>
 
         {/* Right: Find Safe Route Button */}
