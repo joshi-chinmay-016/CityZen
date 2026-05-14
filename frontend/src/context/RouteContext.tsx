@@ -9,6 +9,8 @@ interface RouteContextType {
   error: string | null;
   sourceCoords: [number, number] | null;
   destinationCoords: [number, number] | null;
+  selectedRouteIndex: number;
+  setSelectedRouteIndex: (index: number) => void;
   setSourceCoords: (coords: [number, number] | null) => void;
   setDestinationCoords: (coords: [number, number] | null) => void;
   selectingField: 'none' | 'source' | 'dest';
@@ -26,10 +28,12 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   const [sourceCoords, setSourceCoords] = useState<[number, number] | null>(null);
   const [destinationCoords, setDestinationCoords] = useState<[number, number] | null>(null);
   const [selectingField, setSelectingField] = useState<'none' | 'source' | 'dest'>('none');
+  const [selectedRouteIndex, setSelectedRouteIndex] = useState<number>(0);
 
   const fetchSafeRoute = useCallback(async (params: RouteRequest) => {
     setIsLoading(true);
     setError(null);
+    setSelectedRouteIndex(0); // Reset selection on new fetch
     try {
       const data = await routeService.getSafeRoute(params);
       
@@ -51,6 +55,7 @@ export function RouteProvider({ children }: { children: ReactNode }) {
     setRouteResult(null);
     setError(null);
     setIsLoading(false);
+    setSelectedRouteIndex(0);
   }, []);
 
   return (
@@ -60,6 +65,8 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       error, 
       sourceCoords, 
       destinationCoords, 
+      selectedRouteIndex,
+      setSelectedRouteIndex,
       setSourceCoords, 
       setDestinationCoords, 
       selectingField,

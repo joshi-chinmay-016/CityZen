@@ -92,13 +92,12 @@ async function getRouteAlternatives(source, destination, maxAlternatives = 3) {
     // Format: /route/v1/{profile}/{coordinates}?options
     // profile: driving
     // coordinates: lng,lat;lng,lat (note: OSRM uses lng,lat order)
-    // alternatives=true: request OSRM alternate routes for comparison
-    // overview=full: get full route geometry
-    // geometries=geojson: return geometry in GeoJSON format (array of [lng, lat])
-    // OSRM expects coordinates in lng,lat order. Convert here explicitly.
-    const url = `${OSRM_BASE_URL}/route/v1/driving/${sourceLng},${sourceLat};${destLng},${destLat}?alternatives=true&overview=full&geometries=geojson&steps=false`;
+    // alternatives=3: request OSRM to find up to 3 alternate routes
+    // continue_straight=false: allow OSRM to deviate more easily for alternatives
+    const url = `${OSRM_BASE_URL}/route/v1/driving/${sourceLng},${sourceLat};${destLng},${destLat}?alternatives=3&overview=full&geometries=geojson&continue_straight=false`;
 
     // Fetch route from OSRM API
+    console.log(`[OSRM] Requesting routes: ${url}`);
     const response = await axios.get(url, { timeout: TIMEOUT_MS });
 
     // Check if OSRM returned a valid response
@@ -108,10 +107,10 @@ async function getRouteAlternatives(source, destination, maxAlternatives = 3) {
       );
     }
 
-    // Extract up to `maxAlternatives` routes and parse them into a simple
-    // structure used by the route stress engine. Convert OSRM's [lng,lat]
-    // geometry to internal [lat,lng].
-    const routes = Array.isArray(response.data.routes) ? response.data.routes.slice(0, maxAlternatives) : [];
+    console.log(`[OSRM] API returned ${response.data.routes?.length || 0} routes.`);
+
+    // Return up to 3 routes returned by OSRM
+    const routes = Array.isArray(response.data.routes) ? response.data.routes.slice(0, 3) : [];
     if (!routes.length) {
       throw new Error('No route found between source and destination.');
     }

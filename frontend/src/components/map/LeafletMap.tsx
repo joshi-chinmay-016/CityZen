@@ -50,11 +50,13 @@ export default function LeafletMap() {
   sourceCoords,
   destinationCoords
   ,
-  selectingField,
-  setSelectingField,
-  setSourceCoords,
-  setDestinationCoords
-} = useSafeRoute();
+    selectingField,
+    setSelectingField,
+    setSourceCoords,
+    setDestinationCoords,
+    selectedRouteIndex,
+    setSelectedRouteIndex
+  } = useSafeRoute();
 
   console.log("LeafletMap routeData", routeResult);
 
@@ -109,9 +111,10 @@ export default function LeafletMap() {
         )}
 
         {/* Safe Route Layer */}
-       <RouteLayer
-        route={routeResult?.route ?? []}
-        safe={routeResult?.safe ?? true}
+        <RouteLayer
+          routes={routeResult?.routes ?? []}
+          selectedRouteIndex={selectedRouteIndex}
+          onSelect={setSelectedRouteIndex}
         />
         {/* Map click handler: listens for clicks when user is selecting source/dest */}
         <MapClickHandler />

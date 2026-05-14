@@ -316,9 +316,12 @@ const routeStressService = {
 
       // 4) Score every alternate route independently integrating both AI hazards
       //    and crowd intelligence, then sort by stress.
+      console.log(`[Route Stress] Analyzing ${routeCandidates.length} route candidates...`);
       const routes = (Array.isArray(routeCandidates) ? routeCandidates : [])
         .map((route) => analyzeRouteCandidate(route, reports, start, end, journeyReports))
         .sort((left, right) => left.stress_score - right.stress_score);
+      
+      console.log(`[Route Stress] Successfully scored ${routes.length} routes.`);
 
       const bestRoute = routes[0] || {
         type: 'safe',
